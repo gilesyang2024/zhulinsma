@@ -196,7 +196,7 @@ class Content(Base):
     is_commentable = Column(Boolean, default=True)
     
     # 元数据
-    metadata = Column(JSONB, default=dict)
+    content_metadata = Column(JSONB, default=dict)
     tags = Column(ARRAY(String))  # 标签数组
     cover_image_url = Column(String(500))
     seo_title = Column(String(255))
@@ -435,7 +435,7 @@ class Comment(Base):
     is_pinned = Column(Boolean, default=False)
     
     # 元数据
-    metadata = Column(JSONB, default=dict)
+    comment_metadata = Column(JSONB, default=dict)
     ip_address = Column(String(45))
     user_agent = Column(Text)
     

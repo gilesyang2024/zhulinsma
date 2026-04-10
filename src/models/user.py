@@ -6,7 +6,7 @@
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, ForeignKey, JSON, CheckConstraint, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, ForeignKey, JSON, CheckConstraint, UniqueConstraint, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -17,6 +17,20 @@ from src.core.database import Base
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# 兼容SQLite的UUID列
+def UUIDColumn():
+    """创建兼容SQLite的UUID列"""
+    import os
+    from sqlalchemy import String
+    from sqlalchemy.dialects.postgresql import UUID
+    
+    # 检查是否使用SQLite
+    from src.core.config import settings
+    if "sqlite" in settings.DATABASE_URL:
+        return Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    else:
+        return Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+
 
 class Role(Base):
     """
@@ -25,7 +39,7 @@ class Role(Base):
     """
     __tablename__ = "roles"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = UUIDColumn()
     name = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(String(255))
     permissions = Column(JSONB, nullable=False, default=dict)  # 权限配置

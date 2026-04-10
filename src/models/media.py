@@ -44,7 +44,7 @@ class Media(Base):
     description = Column(Text)
     alt_text = Column(Text)
     caption = Column(Text)
-    metadata = Column(JSONB, default=dict)  # EXIF, IPTC等
+    media_metadata = Column(JSONB, default=dict)  # EXIF, IPTC等
     tags = Column(ARRAY(String))
     
     # 所有权
@@ -154,7 +154,7 @@ class Media(Base):
                 "file_hash": self.file_hash,
                 "bitrate": self.bitrate,
                 "tags": self.tags,
-                "metadata": self.metadata,
+                "metadata": self.media_metadata,
                 "user_id": str(self.user_id) if self.user_id else None,
                 "content_id": str(self.content_id) if self.content_id else None,
             })
