@@ -1,130 +1,117 @@
 """
-应用配置管理模块
+简化的应用配置管理模块
 
-基于Pydantic Settings管理所有环境变量和配置。
+不使用pydantic-settings，避免JSON解析问题。
+使用python-dotenv直接读取环境变量。
 """
-
 import os
 from typing import List, Optional, Literal
-from pydantic import AnyHttpUrl, Field, PostgresDsn, validator
-from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+# 加载.env文件
+load_dotenv()
 
 
-class Settings(BaseSettings):
+class Settings:
     """应用配置"""
     
-    # 应用基础配置
-    APP_NAME: str = "竹林司马后端"
-    APP_ENV: Literal["development", "staging", "production"] = "development"
-    APP_VERSION: str = "1.0.0"
-    APP_DEBUG: bool = False
-    APP_SECRET_KEY: str = Field(..., min_length=32)
-    APP_ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
+    def __init__(self):
+        # 应用基础配置
+        self.APP_NAME = self._get_env("APP_NAME", "竹林司马后端")
+        self.APP_ENV = self._get_env("APP_ENV", "development")
+        self.APP_VERSION = self._get_env("APP_VERSION", "1.0.0")
+        self.APP_DEBUG = self._get_env_bool("APP_DEBUG", True)
+        self.APP_SECRET_KEY = self._get_env("APP_SECRET_KEY", "development-secret-key-must-be-32-chars-long")
+        
+        # 处理列表字段
+        self.APP_ALLOWED_HOSTS = self._get_env_list("APP_ALLOWED_HOSTS", ["localhost", "127.0.0.1"])
+        self.APP_CORS_ORIGINS = self._get_env_list("APP_CORS_ORIGINS", ["http://localhost:3000", "http://localhost:8000"])
+        
+        # API配置
+        self.API_V1_STR = self._get_env("API_V1_STR", "/api/v1")
+        self.API_PREFIX = self._get_env("API_PREFIX", "/api")
+        self.PROJECT_NAME = self._get_env("PROJECT_NAME", "竹林司马API")
+        
+        # 数据库配置
+        self.DATABASE_URL = self._get_env("DATABASE_URL", "sqlite+aiosqlite:///./zhulinsma.db")
+        self.DATABASE_POOL_SIZE = self._get_env_int("DATABASE_POOL_SIZE", 5)
+        self.DATABASE_MAX_OVERFLOW = self._get_env_int("DATABASE_MAX_OVERFLOW", 10)
+        self.DATABASE_POOL_RECYCLE = self._get_env_int("DATABASE_POOL_RECYCLE", 3600)
+        self.DATABASE_ECHO = self._get_env_bool("DATABASE_ECHO", False)
+        
+        # Redis配置
+        self.REDIS_URL = self._get_env("REDIS_URL", "redis://localhost:6379/0")
+        self.REDIS_PASSWORD = self._get_env("REDIS_PASSWORD", None)
+        self.REDIS_POOL_SIZE = self._get_env_int("REDIS_POOL_SIZE", 5)
+        
+        # JWT配置
+        self.JWT_SECRET_KEY = self._get_env("JWT_SECRET_KEY", "development-jwt-secret-key-must-be-32-chars")
+        self.JWT_ALGORITHM = self._get_env("JWT_ALGORITHM", "HS256")
+        self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES = self._get_env_int("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", 30)
+        self.JWT_REFRESH_TOKEN_EXPIRE_DAYS = self._get_env_int("JWT_REFRESH_TOKEN_EXPIRE_DAYS", 7)
+        
+        # 文件上传配置
+        self.FILE_UPLOAD_MAX_SIZE = self._get_env_int("FILE_UPLOAD_MAX_SIZE", 10485760)  # 10MB
+        self.FILE_STORAGE_PROVIDER = self._get_env("FILE_STORAGE_PROVIDER", "local")
+        self.FILE_STORAGE_PATH = self._get_env("FILE_STORAGE_PATH", "./uploads")
+        
+        # 日志配置
+        self.LOG_LEVEL = self._get_env("LOG_LEVEL", "INFO")
+        self.LOG_FORMAT = self._get_env("LOG_FORMAT", "json")
+        self.LOG_FILE = self._get_env("LOG_FILE", "./logs/app.log")
+        
+        # 验证密钥长度
+        if len(self.APP_SECRET_KEY) < 32:
+            raise ValueError(f"APP_SECRET_KEY必须至少32个字符，当前{len(self.APP_SECRET_KEY)}个字符")
+        
+        if len(self.JWT_SECRET_KEY) < 32:
+            raise ValueError(f"JWT_SECRET_KEY必须至少32个字符，当前{len(self.JWT_SECRET_KEY)}个字符")
     
-    # CORS配置
-    APP_CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-    ]
+    def _get_env(self, key: str, default: Optional[str] = None) -> str:
+        """获取环境变量"""
+        value = os.getenv(key)
+        if value is None:
+            if default is None:
+                raise ValueError(f"环境变量{key}未设置")
+            return default
+        return value
     
-    # API配置
-    API_V1_STR: str = "/api/v1"
-    API_PREFIX: str = "/api"
-    PROJECT_NAME: str = "竹林司马API"
+    def _get_env_int(self, key: str, default: int) -> int:
+        """获取整数环境变量"""
+        value = os.getenv(key)
+        if value is None:
+            return default
+        try:
+            return int(value)
+        except ValueError:
+            return default
     
-    # 数据库配置
-    DATABASE_URL: PostgresDsn = "postgresql://zhulin:password@localhost:5432/zhulinsma"
-    DATABASE_POOL_SIZE: int = 20
-    DATABASE_MAX_OVERFLOW: int = 30
-    DATABASE_POOL_RECYCLE: int = 3600
-    DATABASE_ECHO: bool = False
+    def _get_env_bool(self, key: str, default: bool) -> bool:
+        """获取布尔环境变量"""
+        value = os.getenv(key)
+        if value is None:
+            return default
+        value_lower = value.lower()
+        if value_lower in ("true", "1", "yes", "on"):
+            return True
+        elif value_lower in ("false", "0", "no", "off"):
+            return False
+        return default
     
-    # Redis配置
-    REDIS_URL: str = "redis://localhost:6379/0"
-    REDIS_PASSWORD: Optional[str] = None
-    REDIS_POOL_SIZE: int = 10
-    
-    # 消息队列配置
-    RABBITMQ_URL: str = "amqp://guest:guest@localhost:5672/"
-    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
-    
-    # JWT配置
-    JWT_SECRET_KEY: str = Field(..., min_length=32)
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    
-    # 文件上传配置
-    FILE_UPLOAD_MAX_SIZE: int = 100 * 1024 * 1024  # 100MB
-    FILE_STORAGE_PROVIDER: Literal["local", "s3", "minio"] = "local"
-    FILE_STORAGE_PATH: str = "./uploads"
-    
-    # AWS S3配置
-    AWS_ACCESS_KEY_ID: Optional[str] = None
-    AWS_SECRET_ACCESS_KEY: Optional[str] = None
-    AWS_S3_BUCKET: str = "zhulinsma"
-    AWS_S3_REGION: str = "ap-guangzhou"
-    
-    # MinIO配置
-    MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
-    MINIO_SECURE: bool = False
-    
-    # 邮件配置
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    SMTP_FROM_EMAIL: str = "noreply@zhulinsma.com"
-    SMTP_USE_TLS: bool = True
-    
-    # 监控配置
-    SENTRY_DSN: Optional[str] = None
-    PROMETHEUS_METRICS_PORT: int = 9090
-    GRAFANA_URL: str = "http://localhost:3000"
-    
-    # 第三方API配置
-    GITHUB_CLIENT_ID: Optional[str] = None
-    GITHUB_CLIENT_SECRET: Optional[str] = None
-    GOOGLE_CLIENT_ID: Optional[str] = None
-    GOOGLE_CLIENT_SECRET: Optional[str] = None
-    
-    # 速率限制配置
-    RATE_LIMIT_ENABLED: bool = True
-    RATE_LIMIT_DEFAULT: str = "100/minute"
-    RATE_LIMIT_AUTH: str = "10/minute"
-    RATE_LIMIT_UPLOAD: str = "20/5minutes"
-    
-    # 安全配置
-    SECURE_COOKIES: bool = False
-    CSP_ENABLED: bool = False
-    HSTS_ENABLED: bool = False
-    
-    # 日志配置
-    LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: Literal["json", "text"] = "json"
-    LOG_FILE: str = "./logs/app.log"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        extra = "ignore"
-    
-    @validator("APP_CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v):
-        """处理CORS来源配置"""
-        if isinstance(v, str):
-            return [i.strip() for i in v.split(",")]
-        return v
-    
-    @validator("APP_ALLOWED_HOSTS", pre=True)
-    def assemble_allowed_hosts(cls, v):
-        """处理允许的主机配置"""
-        if isinstance(v, str):
-            return [i.strip() for i in v.split(",")]
-        return v
+    def _get_env_list(self, key: str, default: List[str]) -> List[str]:
+        """获取列表环境变量（逗号分隔）"""
+        value = os.getenv(key)
+        if value is None:
+            return default
+        
+        # 移除可能的引号
+        value = value.strip('"').strip("'")
+        
+        # 分割为列表
+        if not value:
+            return []
+        
+        return [item.strip() for item in value.split(",") if item.strip()]
     
     @property
     def is_production(self) -> bool:
@@ -145,20 +132,11 @@ class Settings(BaseSettings):
     def database_config(self) -> dict:
         """数据库配置字典"""
         return {
-            "url": str(self.DATABASE_URL),
+            "url": self.DATABASE_URL,
             "pool_size": self.DATABASE_POOL_SIZE,
             "max_overflow": self.DATABASE_MAX_OVERFLOW,
             "pool_recycle": self.DATABASE_POOL_RECYCLE,
             "echo": self.DATABASE_ECHO,
-        }
-    
-    @property
-    def redis_config(self) -> dict:
-        """Redis配置字典"""
-        return {
-            "url": self.REDIS_URL,
-            "password": self.REDIS_PASSWORD,
-            "pool_size": self.REDIS_POOL_SIZE,
         }
     
     @property
@@ -170,33 +148,6 @@ class Settings(BaseSettings):
             "access_token_expire_minutes": self.JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
             "refresh_token_expire_days": self.JWT_REFRESH_TOKEN_EXPIRE_DAYS,
         }
-    
-    @property
-    def storage_config(self) -> dict:
-        """文件存储配置字典"""
-        return {
-            "provider": self.FILE_STORAGE_PROVIDER,
-            "local_path": self.FILE_STORAGE_PATH,
-            "max_size": self.FILE_UPLOAD_MAX_SIZE,
-            "aws_access_key_id": self.AWS_ACCESS_KEY_ID,
-            "aws_secret_access_key": self.AWS_SECRET_ACCESS_KEY,
-            "aws_s3_bucket": self.AWS_S3_BUCKET,
-            "aws_s3_region": self.AWS_S3_REGION,
-            "minio_endpoint": self.MINIO_ENDPOINT,
-            "minio_access_key": self.MINIO_ACCESS_KEY,
-            "minio_secret_key": self.MINIO_SECRET_KEY,
-            "minio_secure": self.MINIO_SECURE,
-        }
-    
-    @property
-    def rate_limit_config(self) -> dict:
-        """速率限制配置字典"""
-        return {
-            "enabled": self.RATE_LIMIT_ENABLED,
-            "default": self.RATE_LIMIT_DEFAULT,
-            "auth": self.RATE_LIMIT_AUTH,
-            "upload": self.RATE_LIMIT_UPLOAD,
-        }
 
 
 # 全局配置实例
@@ -205,6 +156,5 @@ settings = Settings()
 # 环境变量覆盖（用于测试）
 if os.getenv("APP_ENV") == "test":
     settings.DATABASE_URL = "postgresql://test:test@localhost:5432/zhulinsma_test"
-    settings.REDIS_URL = "redis://localhost:6379/15"  # 使用不同的数据库
+    settings.REDIS_URL = "redis://localhost:6379/15"
     settings.APP_DEBUG = True
-    settings.RATE_LIMIT_ENABLED = False

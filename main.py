@@ -6,6 +6,7 @@ FastAPI应用实例和启动配置。
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 import uvicorn
 from fastapi import FastAPI, Request, status
@@ -19,6 +20,13 @@ from src.core.database import db, check_database_health
 from src.core.cache import cache, check_cache_health
 from src.core.security import check_security_health
 from src.api.v1 import api_router
+
+# 导入OpenAPI配置
+try:
+    from docs.openapi_config import get_openapi_config, customize_openapi_schema
+    ENABLE_ENHANCED_DOCS = True
+except ImportError:
+    ENABLE_ENHANCED_DOCS = False
 
 # 配置日志
 logging.basicConfig(
@@ -78,15 +86,30 @@ async def lifespan(app: FastAPI):
 
 
 # 创建FastAPI应用实例
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.APP_VERSION,
-    description="竹林司马内容管理系统的后端API",
-    docs_url="/api/docs" if settings.is_development else None,
-    redoc_url="/api/redoc" if settings.is_development else None,
-    openapi_url="/api/openapi.json" if settings.is_development else None,
-    lifespan=lifespan,
-)
+app_kwargs = {
+    "title": settings.PROJECT_NAME,
+    "version": settings.APP_VERSION,
+    "description": "竹林司马内容管理系统的后端API",
+    "docs_url": "/api/docs" if settings.is_development else None,
+    "redoc_url": "/api/redoc" if settings.is_development else None,
+    "openapi_url": "/api/openapi.json" if settings.is_development else None,
+    "lifespan": lifespan,
+}
+
+# 如果启用了增强文档，添加配置
+if ENABLE_ENHANCED_DOCS:
+    openapi_config = get_openapi_config()
+    app_kwargs.update(openapi_config)
+
+app = FastAPI(**app_kwargs)
+
+# 自定义OpenAPI schema
+if ENABLE_ENHANCED_DOCS:
+    @app.on_event("startup")
+    async def customize_openapi():
+        openapi_schema = app.openapi()
+        if openapi_schema:
+            app.openapi_schema = customize_openapi_schema(openapi_schema)
 
 # 注册异常处理器
 register_exception_handlers(app)
