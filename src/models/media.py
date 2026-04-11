@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, JSON, CheckConstraint, Text, BigInteger, ARRAY
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
+from src.core.uuid_compat import GUID, JSONB
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql import func
@@ -22,7 +22,7 @@ class Media(Base):
     """
     __tablename__ = "media"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid4)
     filename = Column(String(255), nullable=False, index=True)
     original_filename = Column(String(255))
     mime_type = Column(String(100))
@@ -48,8 +48,8 @@ class Media(Base):
     tags = Column(ARRAY(String))
     
     # 所有权
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    content_id = Column(PG_UUID(as_uuid=True), ForeignKey("content.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    content_id = Column(GUID(), ForeignKey("content.id", ondelete="SET NULL"), nullable=True)
     
     # 状态
     is_public = Column(Boolean, default=True)
@@ -194,8 +194,8 @@ class MediaProcessTask(Base):
     """
     __tablename__ = "media_process_tasks"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    media_id = Column(PG_UUID(as_uuid=True), ForeignKey("media.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid4)
+    media_id = Column(GUID(), ForeignKey("media.id", ondelete="CASCADE"), nullable=False)
     task_type = Column(String(50), nullable=False)
     status = Column(String(20), default="pending")
     parameters = Column(JSONB, default=dict)
@@ -276,11 +276,11 @@ class AuditLog(Base):
     """
     __tablename__ = "audit_logs"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id = Column(GUID(), primary_key=True, default=uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     action = Column(String(100), nullable=False, index=True)
     resource_type = Column(String(50), index=True)
-    resource_id = Column(PG_UUID(as_uuid=True), index=True)
+    resource_id = Column(GUID(), index=True)
     
     # 请求信息
     ip_address = Column(String(45))

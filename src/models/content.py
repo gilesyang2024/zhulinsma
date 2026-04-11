@@ -7,12 +7,13 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, ForeignKey, JSON, CheckConstraint, UniqueConstraint, Text, ARRAY, BigInteger
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql import func
 
 from src.core.database import Base
+from src.core.uuid_compat import GUID
 
 
 class Tag(Base):
@@ -22,7 +23,7 @@ class Tag(Base):
     """
     __tablename__ = "tags"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid4)
     name = Column(String(50), unique=True, nullable=False, index=True)
     slug = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(Text)
@@ -77,8 +78,8 @@ class ContentTag(Base):
     """
     __tablename__ = "content_tags"
     
-    content_id = Column(PG_UUID(as_uuid=True), ForeignKey("content.id", ondelete="CASCADE"), primary_key=True)
-    tag_id = Column(PG_UUID(as_uuid=True), ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
+    content_id = Column(GUID(), ForeignKey("content.id", ondelete="CASCADE"), primary_key=True)
+    tag_id = Column(GUID(), ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 关系
@@ -96,11 +97,11 @@ class Category(Base):
     """
     __tablename__ = "categories"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid4)
     name = Column(String(100), nullable=False, index=True)
     slug = Column(String(100), unique=True, nullable=False, index=True)
     description = Column(Text)
-    parent_id = Column(PG_UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    parent_id = Column(GUID(), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     icon_url = Column(String(500))
     sort_order = Column(Integer, default=0)
     is_featured = Column(Boolean, default=False)
@@ -151,8 +152,8 @@ class ContentCategory(Base):
     """
     __tablename__ = "content_categories"
     
-    content_id = Column(PG_UUID(as_uuid=True), ForeignKey("content.id", ondelete="CASCADE"), primary_key=True)
-    category_id = Column(PG_UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True)
+    content_id = Column(GUID(), ForeignKey("content.id", ondelete="CASCADE"), primary_key=True)
+    category_id = Column(GUID(), ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True)
     is_primary = Column(Boolean, default=False)  # 是否为主要分类
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -175,7 +176,7 @@ class Content(Base):
     """
     __tablename__ = "content"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid4)
     title = Column(String(255), nullable=False, index=True)
     slug = Column(String(255), unique=True, nullable=False, index=True)
     excerpt = Column(Text)
@@ -184,9 +185,9 @@ class Content(Base):
     format = Column(String(20), default="markdown")
     
     # 作者和所有权
-    author_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    organization_id = Column(PG_UUID(as_uuid=True), nullable=True)
+    author_id = Column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    owner_id = Column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(GUID(), nullable=True)
     
     # 状态管理
     status = Column(String(20), nullable=False, default="draft")
@@ -372,12 +373,12 @@ class ContentVersion(Base):
     """
     __tablename__ = "content_versions"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    content_id = Column(PG_UUID(as_uuid=True), ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid4)
+    content_id = Column(GUID(), ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
     version_number = Column(Integer, nullable=False)
     title = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
-    author_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    author_id = Column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     change_description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -423,10 +424,10 @@ class Comment(Base):
     """
     __tablename__ = "comments"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    content_id = Column(PG_UUID(as_uuid=True), ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    parent_id = Column(PG_UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    id = Column(GUID(), primary_key=True, default=uuid4)
+    content_id = Column(GUID(), ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_id = Column(GUID(), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
     content = Column(Text, nullable=False)
     
     # 状态管理
@@ -536,8 +537,8 @@ class CommentLike(Base):
     """
     __tablename__ = "comment_likes"
     
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    comment_id = Column(PG_UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    comment_id = Column(GUID(), ForeignKey("comments.id", ondelete="CASCADE"), primary_key=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # 关系

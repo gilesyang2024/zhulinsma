@@ -1,16 +1,24 @@
-"""Initial database schema
+"""Initial database schema (跨数据库兼容版本)
 
-Revision ID: 001_initial_database_schema
+Revision ID: 001_initial_database_schema_fixed
 Revises: 
-Create Date: 2026-04-10 09:45:00.000000
+Create Date: 2026-04-11 08:44:00.000000
 
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+import uuid
+
+# 导入UUID兼容性模块
+try:
+    from src.core.uuid_compat import GUID
+except ImportError:
+    # 如果在迁移环境中不可用，使用字符串类型作为后备
+    GUID = sa.String(32)
 
 # revision identifiers, used by Alembic.
-revision = '001_initial_database_schema'
+revision = '001_initial_database_schema_fixed'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,10 +29,10 @@ def upgrade() -> None:
     
     # 创建 roles 表
     op.create_table('roles',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
     sa.Column('name', sa.String(length=50), nullable=False),
     sa.Column('description', sa.String(length=255), nullable=True),
-    sa.Column('permissions', sa.ARRAY(sa.String()), nullable=True),
+    sa.Column('permissions', postgresql.ARRAY(sa.String()), nullable=True),
     sa.Column('is_default', sa.Boolean(), nullable=True),
     sa.Column('is_system', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
@@ -36,7 +44,7 @@ def upgrade() -> None:
     
     # 创建 users 表
     op.create_table('users',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
     sa.Column('username', sa.String(length=50), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=False),
     sa.Column('phone_number', sa.String(length=20), nullable=True),
@@ -65,8 +73,8 @@ def upgrade() -> None:
     
     # 创建 user_roles 表
     op.create_table('user_roles',
-    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('role_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('user_id', GUID(), nullable=False),
+    sa.Column('role_id', GUID(), nullable=False),
     sa.Column('assigned_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
@@ -76,7 +84,7 @@ def upgrade() -> None:
     
     # 创建 user_settings 表
     op.create_table('user_settings',
-    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('user_id', GUID(), nullable=False),
     sa.Column('theme', sa.String(length=20), nullable=True),
     sa.Column('language', sa.String(length=10), nullable=True),
     sa.Column('notifications_enabled', sa.Boolean(), nullable=True),
@@ -93,7 +101,7 @@ def upgrade() -> None:
     
     # 创建 user_statistics 表
     op.create_table('user_statistics',
-    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('user_id', GUID(), nullable=False),
     sa.Column('total_content', sa.BigInteger(), nullable=True),
     sa.Column('total_comments', sa.BigInteger(), nullable=True),
     sa.Column('total_likes_received', sa.BigInteger(), nullable=True),
@@ -111,13 +119,13 @@ def upgrade() -> None:
     
     # 创建 categories 表
     op.create_table('categories',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('slug', sa.String(length=100), nullable=False),
     sa.Column('description', sa.String(length=500), nullable=True),
     sa.Column('icon', sa.String(length=50), nullable=True),
     sa.Column('color', sa.String(length=7), nullable=True),
-    sa.Column('parent_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('parent_id', GUID(), nullable=True),
     sa.Column('display_order', sa.Integer(), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
@@ -131,7 +139,7 @@ def upgrade() -> None:
     
     # 创建 tags 表
     op.create_table('tags',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
     sa.Column('name', sa.String(length=50), nullable=False),
     sa.Column('slug', sa.String(length=50), nullable=False),
     sa.Column('description', sa.String(length=255), nullable=True),
@@ -147,7 +155,7 @@ def upgrade() -> None:
     
     # 创建 content 表
     op.create_table('content',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
     sa.Column('title', sa.String(length=255), nullable=False),
     sa.Column('slug', sa.String(length=255), nullable=False),
     sa.Column('excerpt', sa.String(length=500), nullable=True),
@@ -155,7 +163,7 @@ def upgrade() -> None:
     sa.Column('content_type', sa.String(length=50), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('visibility', sa.String(length=20), nullable=False),
-    sa.Column('author_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('author_id', GUID(), nullable=False),
     sa.Column('cover_image_url', sa.String(length=500), nullable=True),
     sa.Column('featured_image_url', sa.String(length=500), nullable=True),
     sa.Column('read_time_minutes', sa.Integer(), nullable=True),
@@ -182,10 +190,10 @@ def upgrade() -> None:
     
     # 创建 comments 表
     op.create_table('comments',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('content_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('author_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('parent_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
+    sa.Column('content_id', GUID(), nullable=False),
+    sa.Column('author_id', GUID(), nullable=False),
+    sa.Column('parent_id', GUID(), nullable=True),
     sa.Column('content', sa.Text(), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('like_count', sa.BigInteger(), nullable=True),
@@ -205,8 +213,8 @@ def upgrade() -> None:
     
     # 创建 content_categories 关联表
     op.create_table('content_categories',
-    sa.Column('content_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('category_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('content_id', GUID(), nullable=False),
+    sa.Column('category_id', GUID(), nullable=False),
     sa.Column('assigned_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),
     sa.ForeignKeyConstraint(['content_id'], ['content.id'], ),
@@ -216,8 +224,8 @@ def upgrade() -> None:
     
     # 创建 content_tags 关联表
     op.create_table('content_tags',
-    sa.Column('content_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('tag_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('content_id', GUID(), nullable=False),
+    sa.Column('tag_id', GUID(), nullable=False),
     sa.Column('assigned_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['content_id'], ['content.id'], ),
     sa.ForeignKeyConstraint(['tag_id'], ['tags.id'], ),
@@ -227,8 +235,8 @@ def upgrade() -> None:
     
     # 创建 comment_likes 表
     op.create_table('comment_likes',
-    sa.Column('comment_id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('comment_id', GUID(), nullable=False),
+    sa.Column('user_id', GUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['comment_id'], ['comments.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
@@ -238,12 +246,12 @@ def upgrade() -> None:
     
     # 创建 content_versions 表
     op.create_table('content_versions',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('content_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
+    sa.Column('content_id', GUID(), nullable=False),
     sa.Column('version_number', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(length=255), nullable=False),
     sa.Column('content', sa.Text(), nullable=False),
-    sa.Column('author_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('author_id', GUID(), nullable=False),
     sa.Column('change_summary', sa.String(length=500), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['author_id'], ['users.id'], ),
@@ -255,7 +263,7 @@ def upgrade() -> None:
     
     # 创建 media 表
     op.create_table('media',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
     sa.Column('filename', sa.String(length=255), nullable=False),
     sa.Column('original_filename', sa.String(length=255), nullable=False),
     sa.Column('file_path', sa.String(length=500), nullable=False),
@@ -275,8 +283,8 @@ def upgrade() -> None:
     sa.Column('is_processed', sa.Boolean(), nullable=True),
     sa.Column('process_status', sa.String(length=20), nullable=True),
     sa.Column('tags', postgresql.ARRAY(sa.String()), nullable=True),
-    sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.Column('uploaded_by', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('media_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+    sa.Column('uploaded_by', GUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['uploaded_by'], ['users.id'], ),
@@ -288,8 +296,8 @@ def upgrade() -> None:
     
     # 创建 media_process_tasks 表
     op.create_table('media_process_tasks',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('media_id', postgresql.UUID(as_uuid=True), nullable=False),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
+    sa.Column('media_id', GUID(), nullable=False),
     sa.Column('task_type', sa.String(length=50), nullable=False),
     sa.Column('status', sa.String(length=20), nullable=False),
     sa.Column('priority', sa.Integer(), nullable=True),
@@ -311,8 +319,8 @@ def upgrade() -> None:
     
     # 创建 audit_logs 表
     op.create_table('audit_logs',
-    sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('id', GUID(), nullable=False, default=lambda: str(uuid.uuid4())),
+    sa.Column('user_id', GUID(), nullable=True),
     sa.Column('action', sa.String(length=100), nullable=False),
     sa.Column('resource_type', sa.String(length=50), nullable=True),
     sa.Column('resource_id', sa.String(length=100), nullable=True),

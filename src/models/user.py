@@ -7,7 +7,7 @@ from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, ForeignKey, JSON, CheckConstraint, UniqueConstraint, Text
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
+from src.core.uuid_compat import GUID, JSONB
 from sqlalchemy.orm import relationship, validates
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql import func
@@ -29,7 +29,7 @@ def UUIDColumn():
     if "sqlite" in settings.DATABASE_URL:
         return Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     else:
-        return Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+        return Column(GUID(), primary_key=True, default=uuid4)
 
 
 class Role(Base):
@@ -67,10 +67,10 @@ class UserRole(Base):
     """
     __tablename__ = "user_roles"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    role_id = Column(PG_UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
-    assigned_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    id = Column(GUID(), primary_key=True, default=uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role_id = Column(GUID(), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+    assigned_by = Column(GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
@@ -94,7 +94,7 @@ class User(Base):
     """
     __tablename__ = "users"
     
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid4)
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     phone = Column(String(20), unique=True, nullable=True, index=True)
@@ -238,7 +238,7 @@ class UserSettings(Base):
     """
     __tablename__ = "user_settings"
     
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     email_notifications = Column(Boolean, default=True)
     push_notifications = Column(Boolean, default=True)
     privacy_level = Column(String(20), default="public")
@@ -267,7 +267,7 @@ class UserStatistics(Base):
     """
     __tablename__ = "user_statistics"
     
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     content_count = Column(Integer, default=0)
     comment_count = Column(Integer, default=0)
     like_count_received = Column(Integer, default=0)

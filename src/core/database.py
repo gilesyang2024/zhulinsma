@@ -41,22 +41,35 @@ class Database:
             logger.warning("数据库连接已存在")
             return
         
-        # 创建异步引擎
-        engine_config = {
-            "pool_size": settings.DATABASE_POOL_SIZE,
-            "max_overflow": settings.DATABASE_MAX_OVERFLOW,
-            "pool_recycle": settings.DATABASE_POOL_RECYCLE,
-            "pool_pre_ping": True,
-            "echo": settings.DATABASE_ECHO,
-        }
+        database_url = str(settings.DATABASE_URL)
         
-        # 测试环境使用NullPool
-        if settings.APP_ENV == "test":
-            engine_config["poolclass"] = NullPool
+        # 根据数据库类型创建引擎配置
+        if "sqlite" in database_url:
+            # SQLite不支持连接池
+            engine_config = {
+                "echo": settings.DATABASE_ECHO,
+                "poolclass": NullPool,  # SQLite必须使用NullPool
+                "connect_args": {"check_same_thread": False}  # SQLite需要这个参数
+            }
+            logger.info("使用SQLite配置（无连接池）")
+        else:
+            # PostgreSQL和其他数据库使用连接池
+            engine_config = {
+                "pool_size": settings.DATABASE_POOL_SIZE,
+                "max_overflow": settings.DATABASE_MAX_OVERFLOW,
+                "pool_recycle": settings.DATABASE_POOL_RECYCLE,
+                "pool_pre_ping": True,
+                "echo": settings.DATABASE_ECHO,
+            }
+            
+            # 测试环境使用NullPool
+            if settings.APP_ENV == "test":
+                engine_config["poolclass"] = NullPool
+                logger.info("测试环境使用NullPool")
         
         try:
             self._engine = create_async_engine(
-                str(settings.DATABASE_URL),
+                database_url,
                 **engine_config,
             )
             
