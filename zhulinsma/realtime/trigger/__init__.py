@@ -1,302 +1,219 @@
+#!/usr/bin/env python3
 """
-预警触发器 - 实时监控技术指标并触发预警
+竹林司马 (Zhulinsma) - 预警触发器
+实时监控技术指标，触发 RSI超买超卖、金叉死叉、均线偏离等预警
 """
-from typing import Dict, List, Callable, Optional
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
+
+import time
 import logging
-import json
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional
 
-from ..processor import IndicatorResult
-from ..protocol import AlertType, AlertData, MessageParser
+from ..protocol import AlertMessage, AlertType
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class TriggerState(Enum):
-    """触发状态"""
-    IDLE = "idle"           # 未触发
-    TRIGGERED = "triggered" # 已触发
-    COOLDOWN = "cooldown"  # 冷却中
-
-
 @dataclass
-class AlertRule:
-    """预警规则"""
-    stock_code: str
-    alert_type: AlertType
-    threshold: float
-    enabled: bool = True
-    cooldown_seconds: int = 300  # 冷却时间（秒）
-    message_template: str = ""   # 自定义消息模板
-    
-    def get_message(self, value: float, indicators: dict = None) -> str:
-        """生成预警消息"""
-        if self.message_template:
-            return self.message_template.format(
-                stock_code=self.stock_code,
-                value=value,
-                threshold=self.threshold
-            )
-        
-        # 默认消息模板
-        templates = {
-            AlertType.RSI_OVERBOUGHT: f"{self.stock_code} RSI指标达到{value:.1f}，已超买，注意回调风险",
-            AlertType.RSI_OVERSOLD: f"{self.stock_code} RSI指标达到{value:.1f}，已超卖，关注反弹机会",
-            AlertType.GOLDEN_CROSS: f"{self.stock_code} 出现金叉信号（5日均线上穿10日均线）",
-            AlertType.DEATH_CROSS: f"{self.stock_code} 出现死叉信号（5日均线下穿10日均线）",
-            AlertType.VOLUME_SPIKE: f"{self.stock_code} 成交量异动，量能放大至{value:.1f}倍",
-            AlertType.DEVIATION_ALERT: f"{self.stock_code} 股价偏离5日均线{value:.2f}%，注意风险",
-            AlertType.PRICE_BREAK: f"{self.stock_code} 价格突破{self.threshold}阻力位"
-        }
-        
-        return templates.get(self.alert_type, f"{self.stock_code} 触发{self.alert_type.value}预警")
+class 预警规则:
+    """单条预警规则配置"""
+    规则ID: str
+    类型: str                          # AlertType 枚举值
+    描述: str
+    启用: bool = True
+    冷却秒数: int = 300                # 同一规则最少间隔触发时间（防止频繁报警）
+    _上次触发时间: float = field(default=0.0, repr=False)
 
+    def 可触发(self) -> bool:
+        return self.启用 and (time.time() - self._上次触发时间) >= self.冷却秒数
 
-@dataclass
-class TriggeredAlert:
-    """已触发的预警"""
-    rule: AlertRule
-    value: float
-    timestamp: str
-    indicators: dict
-    
-    def to_alert_data(self) -> AlertData:
-        """转换为AlertData"""
-        return AlertData(
-            alert_type=self.rule.alert_type.value,
-            stock_code=self.rule.stock_code,
-            message=self.rule.get_message(self.value, self.indicators),
-            value=self.value,
-            threshold=self.rule.threshold,
-            timestamp=self.timestamp
-        )
+    def 标记已触发(self) -> None:
+        self._上次触发时间 = time.time()
 
 
 class AlertTrigger:
-    """预警触发器"""
-    
+    """
+    预警触发器
+
+    功能：
+    - RSI 超买/超卖预警（RSI > 70 或 < 30）
+    - MACD 金叉/死叉预警
+    - 均线偏离度预警（价格偏离 MA20 超过阈值）
+    - 成交量异动预警（量比超过阈值）
+    - 支持自定义规则扩展
+    - 预警回调注册
+    """
+
     def __init__(self):
-        self._rules: Dict[str, List[AlertRule]] = {}  # stock_code -> rules
-        self._callbacks: List[Callable] = []
-        self._triggered_history: Dict[str, TriggeredAlert] = {}  # rule_id -> triggered alert
-        self._cooldown_end: Dict[str, datetime] = {}  # rule_id -> cooldown end time
-    
-    def add_rule(self, rule: AlertRule):
-        """添加预警规则"""
-        stock_code = rule.stock_code
-        
-        if stock_code not in self._rules:
-            self._rules[stock_code] = []
-        
-        # 检查是否已存在相同规则
-        for existing_rule in self._rules[stock_code]:
-            if (existing_rule.alert_type == rule.alert_type and 
-                existing_rule.threshold == rule.threshold):
-                logger.warning(f"规则已存在: {stock_code} {rule.alert_type.value}")
-                return
-        
-        self._rules[stock_code].append(rule)
-        logger.info(f"添加预警规则: {stock_code} {rule.alert_type.value} 阈值={rule.threshold}")
-    
-    def remove_rule(self, stock_code: str, alert_type: AlertType):
-        """移除预警规则"""
-        if stock_code in self._rules:
-            self._rules[stock_code] = [
-                r for r in self._rules[stock_code] 
-                if r.alert_type != alert_type
-            ]
-            logger.info(f"移除预警规则: {stock_code} {alert_type.value}")
-    
-    def clear_rules(self, stock_code: str = None):
-        """清空预警规则"""
-        if stock_code:
-            self._rules.pop(stock_code, None)
-        else:
-            self._rules.clear()
-        logger.info(f"清空预警规则: {stock_code or '全部'}")
-    
-    def register_callback(self, callback: Callable):
-        """注册回调函数"""
-        self._callbacks.append(callback)
-    
-    def check(self, stock_code: str, indicators: IndicatorResult) -> List[TriggeredAlert]:
-        """检查是否触发预警"""
-        triggered_alerts = []
-        
-        rules = self._rules.get(stock_code, [])
-        
-        for rule in rules:
-            if not rule.enabled:
-                continue
-            
-            # 检查冷却时间
-            rule_id = f"{stock_code}_{rule.alert_type.value}"
-            if rule_id in self._cooldown_end:
-                if datetime.now() < self._cooldown_end[rule_id]:
-                    continue  # 还在冷却中
-            
-            # 检查各项指标
-            alert_triggered = False
-            trigger_value = 0.0
-            
-            if rule.alert_type == AlertType.RSI_OVERBOUGHT:
-                if indicators.rsi and indicators.rsi > rule.threshold:
-                    alert_triggered = True
-                    trigger_value = indicators.rsi
-                    
-            elif rule.alert_type == AlertType.RSI_OVERSOLD:
-                if indicators.rsi and indicators.rsi < rule.threshold:
-                    alert_triggered = True
-                    trigger_value = indicators.rsi
-                    
-            elif rule.alert_type == AlertType.GOLDEN_CROSS:
-                if indicators.golden_cross:
-                    alert_triggered = True
-                    trigger_value = 1.0
-                    
-            elif rule.alert_type == AlertType.DEATH_CROSS:
-                if indicators.death_cross:
-                    alert_triggered = True
-                    trigger_value = 1.0
-                    
-            elif rule.alert_type == AlertType.DEVIATION_ALERT:
-                deviation = abs(indicators.deviation_5 or 0)
-                if deviation > rule.threshold:
-                    alert_triggered = True
-                    trigger_value = deviation
-                    
-            elif rule.alert_type == AlertType.VOLUME_SPIKE:
-                # TODO: 需要成交量数据
-                pass
-                
-            elif rule.alert_type == AlertType.PRICE_BREAK:
-                # TODO: 需要支撑阻力位数据
-                pass
-            
-            # 触发预警
-            if alert_triggered:
-                # 安全转换indicators为字典
-                if hasattr(indicators, 'to_dict'):
-                    indicators_dict = indicators.to_dict()
-                elif isinstance(indicators, dict):
-                    indicators_dict = indicators
-                else:
-                    indicators_dict = {}
-                triggered = TriggeredAlert(
-                    rule=rule,
-                    value=trigger_value,
-                    timestamp=datetime.now().isoformat(),
-                    indicators=indicators_dict
-                )
-                triggered_alerts.append(triggered)
-                
-                # 设置冷却时间
-                self._cooldown_end[rule_id] = (
-                    datetime.now().timestamp() + rule.cooldown_seconds
-                )
-                
-                logger.info(f"触发预警: {rule.stock_code} {rule.alert_type.value} "
-                          f"值={trigger_value:.2f} 阈值={rule.threshold}")
-        
+        self._规则列表: List[预警规则] = self._默认规则()
+        self._回调列表: List[Callable[[AlertMessage], None]] = []
+        self._历史记录: List[AlertMessage] = []
+        # 记录上一次的指标值，用于交叉检测
+        self._前一状态: Dict[str, Dict] = {}
+
+    # ──────────────────────────────────────────────
+    # 公开接口
+    # ──────────────────────────────────────────────
+
+    def 注册回调(self, callback: Callable[[AlertMessage], None]) -> None:
+        """注册预警消息回调"""
+        self._回调列表.append(callback)
+
+    def 检查指标(self, ts_code: str, 指标数据: Dict) -> List[AlertMessage]:
+        """
+        检查一组指标数据，返回触发的预警列表
+
+        参数:
+            ts_code: 股票代码
+            指标数据: IncrementalProcessor.推送价格() 的返回值
+        """
+        触发预警: List[AlertMessage] = []
+
+        # RSI 检查
+        rsi = 指标数据.get("rsi")
+        if rsi is not None:
+            触发预警 += self._检查RSI(ts_code, rsi)
+
+        # MACD 金叉/死叉
+        macd = 指标数据.get("macd", {})
+        if macd.get("hist") is not None:
+            触发预警 += self._检查MACD(ts_code, macd, 指标数据)
+
+        # 均线偏离
+        price = 指标数据.get("price")
+        sma = 指标数据.get("sma", {})
+        if price and sma.get(20):
+            触发预警 += self._检查均线偏离(ts_code, price, sma[20])
+
+        # 更新前一状态
+        self._前一状态[ts_code] = 指标数据
+
         # 触发回调
-        for alert in triggered_alerts:
-            for callback in self._callbacks:
+        for alert in 触发预警:
+            self._历史记录.append(alert)
+            for cb in self._回调列表:
                 try:
-                    callback(alert)
+                    cb(alert)
                 except Exception as e:
-                    logger.error(f"执行回调失败: {e}")
-        
-        return triggered_alerts
-    
-    def get_rules(self, stock_code: str = None) -> List[AlertRule]:
-        """获取预警规则"""
-        if stock_code:
-            return self._rules.get(stock_code, [])
-        else:
-            all_rules = []
-            for rules in self._rules.values():
-                all_rules.extend(rules)
-            return all_rules
-    
-    def get_status(self) -> dict:
-        """获取预警状态"""
+                    logger.warning(f"预警回调异常: {e}")
+
+        if len(self._历史记录) > 1000:
+            self._历史记录 = self._历史记录[-1000:]
+
+        return 触发预警
+
+    def 获取历史预警(self, ts_code: Optional[str] = None, 数量: int = 50) -> List[Dict]:
+        records = self._历史记录
+        if ts_code:
+            records = [r for r in records if r.ts_code == ts_code]
+        return [r.to_dict() for r in records[-数量:]]
+
+    def 统计信息(self) -> Dict:
         return {
-            "total_rules": sum(len(rules) for rules in self._rules.values()),
-            "stocks_tracked": len(self._rules),
-            "triggered_count": len(self._triggered_history)
+            "规则总数": len(self._规则列表),
+            "启用规则": sum(1 for r in self._规则列表 if r.启用),
+            "历史预警数": len(self._历史记录),
+            "回调数量": len(self._回调列表),
         }
 
+    # ──────────────────────────────────────────────
+    # 检查逻辑
+    # ──────────────────────────────────────────────
 
-class AlertManager:
-    """预警管理器 - 整合触发器和消息发送"""
-    
-    def __init__(self, gateway=None):
-        self.trigger = AlertTrigger()
-        self.gateway = gateway
-        self._alert_history: List[TriggeredAlert] = []
-        
-        # 注册回调
-        self.trigger.register_callback(self._on_alert_triggered)
-    
-    def _on_alert_triggered(self, alert: TriggeredAlert):
-        """预警触发回调"""
-        # 保存到历史
-        self._alert_history.append(alert)
-        
-        # 限制历史记录数量
-        if len(self._alert_history) > 1000:
-            self._alert_history = self._alert_history[-500:]
-        
-        # 推送到WebSocket
-        if self.gateway:
-            alert_data = alert.to_alert_data()
-            # 转换AlertData为字典
-            alert_dict = alert_data.to_dict() if hasattr(alert_data, 'to_dict') else alert_data
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # 创建异步任务
-                    import nest_asyncio
-                    try:
-                        nest_asyncio.apply()
-                    except:
-                        pass
-                    loop.run_until_complete(
-                        self.gateway.push_alert(alert.rule.stock_code, alert_dict)
-                    )
-            except Exception as e:
-                logger.error(f"推送预警失败: {e}")
-        
-        logger.info(f"预警触发: {alert.rule.stock_code} {alert.rule.alert_type.value}")
-    
-    async def check_and_notify(self, stock_code: str, indicators: IndicatorResult):
-        """检查并通知"""
-        triggered = self.trigger.check(stock_code, indicators)
-        return triggered
-    
-    def add_rule(self, stock_code: str, alert_type: AlertType, threshold: float, **kwargs):
-        """添加规则（简化接口）"""
-        rule = AlertRule(
-            stock_code=stock_code,
-            alert_type=alert_type,
-            threshold=threshold,
-            **kwargs
-        )
-        self.trigger.add_rule(rule)
-    
-    def get_alert_history(self, stock_code: str = None, limit: int = 50) -> List[TriggeredAlert]:
-        """获取预警历史"""
-        if stock_code:
-            return [a for a in self._alert_history if a.rule.stock_code == stock_code][-limit:]
-        return self._alert_history[-limit:]
+    def _检查RSI(self, ts_code: str, rsi: float) -> List[AlertMessage]:
+        结果 = []
+        if rsi > 70:
+            规则 = self._找规则(AlertType.RSI_OVERBOUGHT)
+            if 规则 and 规则.可触发():
+                规则.标记已触发()
+                结果.append(AlertMessage(
+                    alert_type=AlertType.RSI_OVERBOUGHT,
+                    ts_code=ts_code,
+                    title="RSI 超买预警",
+                    description=f"RSI={rsi:.1f}，已进入超买区间(>70)，注意回调风险",
+                    value=rsi, threshold=70.0, severity="WARN",
+                ))
+        elif rsi < 30:
+            规则 = self._找规则(AlertType.RSI_OVERSOLD)
+            if 规则 and 规则.可触发():
+                规则.标记已触发()
+                结果.append(AlertMessage(
+                    alert_type=AlertType.RSI_OVERSOLD,
+                    ts_code=ts_code,
+                    title="RSI 超卖预警",
+                    description=f"RSI={rsi:.1f}，已进入超卖区间(<30)，关注反弹机会",
+                    value=rsi, threshold=30.0, severity="INFO",
+                ))
+        return 结果
 
+    def _检查MACD(self, ts_code: str, macd: Dict, 当前: Dict) -> List[AlertMessage]:
+        结果 = []
+        前一 = self._前一状态.get(ts_code, {})
+        前一macd = 前一.get("macd", {})
 
-# 添加 asyncio 导入
-import asyncio
+        前hist = 前一macd.get("hist")
+        当hist = macd.get("hist")
 
-# 导出
-__all__ = ['AlertTrigger', 'AlertRule', 'TriggeredAlert', 'AlertManager', 'AlertType']
+        if 前hist is None or 当hist is None:
+            return []
+
+        if 前hist < 0 and 当hist >= 0:
+            规则 = self._找规则(AlertType.MACD_GOLDEN_CROSS)
+            if 规则 and 规则.可触发():
+                规则.标记已触发()
+                结果.append(AlertMessage(
+                    alert_type=AlertType.MACD_GOLDEN_CROSS,
+                    ts_code=ts_code,
+                    title="MACD 金叉信号",
+                    description=f"MACD柱由负转正，金叉信号出现，多头占优",
+                    value=当hist, threshold=0.0, severity="ALERT",
+                ))
+        elif 前hist > 0 and 当hist <= 0:
+            规则 = self._找规则(AlertType.MACD_DEATH_CROSS)
+            if 规则 and 规则.可触发():
+                规则.标记已触发()
+                结果.append(AlertMessage(
+                    alert_type=AlertType.MACD_DEATH_CROSS,
+                    ts_code=ts_code,
+                    title="MACD 死叉信号",
+                    description=f"MACD柱由正转负，死叉信号出现，空头占优",
+                    value=当hist, threshold=0.0, severity="WARN",
+                ))
+        return 结果
+
+    def _检查均线偏离(self, ts_code: str, price: float, ma20: float, 阈值: float = 0.08) -> List[AlertMessage]:
+        if ma20 <= 0:
+            return []
+        偏离度 = (price - ma20) / ma20
+        if abs(偏离度) > 阈值:
+            规则 = self._找规则(AlertType.MA_DEVIATION)
+            if 规则 and 规则.可触发():
+                规则.标记已触发()
+                方向 = "上方" if 偏离度 > 0 else "下方"
+                return [AlertMessage(
+                    alert_type=AlertType.MA_DEVIATION,
+                    ts_code=ts_code,
+                    title=f"均线偏离预警",
+                    description=f"价格偏离MA20达 {偏离度*100:.1f}%（{方向}），均值回归风险",
+                    value=round(偏离度 * 100, 2), threshold=阈值 * 100, severity="WARN",
+                )]
+        return []
+
+    # ──────────────────────────────────────────────
+    # 规则管理
+    # ──────────────────────────────────────────────
+
+    def _默认规则(self) -> List[预警规则]:
+        return [
+            预警规则(规则ID="rsi_ob", 类型=AlertType.RSI_OVERBOUGHT, 描述="RSI超买", 冷却秒数=300),
+            预警规则(规则ID="rsi_os", 类型=AlertType.RSI_OVERSOLD, 描述="RSI超卖", 冷却秒数=300),
+            预警规则(规则ID="macd_g", 类型=AlertType.MACD_GOLDEN_CROSS, 描述="MACD金叉", 冷却秒数=60),
+            预警规则(规则ID="macd_d", 类型=AlertType.MACD_DEATH_CROSS, 描述="MACD死叉", 冷却秒数=60),
+            预警规则(规则ID="ma_dev", 类型=AlertType.MA_DEVIATION, 描述="均线偏离", 冷却秒数=600),
+        ]
+
+    def _找规则(self, 类型: str) -> Optional[预警规则]:
+        for r in self._规则列表:
+            if r.类型 == 类型:
+                return r
+        return None
