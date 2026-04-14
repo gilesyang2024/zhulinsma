@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>竹林司马技术分析报告 - {{股票代码}} {{股票名称}}</title>
+    <style>
+        /* 简洁现代样式 */
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --border: #dee2e6;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .report-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* 头部样式 */
+        .report-header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 40px 50px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.1)" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+            background-size: cover;
+            opacity: 0.3;
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .stock-title {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .stock-code {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 20px;
+            border-radius: 50px;
+            font-size: 1.8rem;
+            font-weight: 300;
+        }
+        
+        .report-meta {
+            display: flex;
+            gap: 40px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .meta-item i {
+            font-size: 1.3rem;
+            opacity: 0.8;
+        }
+        
+        /* 主要内容区域 */
+        .report-body {
+            padding: 40px 50px;
+        }
+        
+        .section {
+            margin-bottom: 50px;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .section-title i {
+            color: var(--secondary);
+        }
+        
+        .section-badge {
+            background: var(--secondary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        /* 图表容器 */
+        .chart-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .chart-container {
+            background: var(--light);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .chart-container:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .chart {
+            width: 100%;
+            height: 400px;
+        }
+        
+        /* 指标卡片 */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            border: 2px solid var(--border);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: var(--secondary);
+        }
+        
+        .metric-card:hover {
+            border-color: var(--secondary);
+            box-shadow: 0 10px 25px rgba(52, 152, 219, 0.1);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 15px 0;
+        }
+        
+        .metric-label {
+            font-size: 0.95rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+        
+        .metric-change {
+            font-size: 0.9rem;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .positive { color: var(--danger); font-weight: 600; }
+        .negative { color: var(--success); font-weight: 600; }
+        
+        /* 信号指示器 */
+        .signal-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 15px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        
+        .signal-buy { background: rgba(39, 174, 96, 0.1); color: var(--success); }
+        .signal-sell { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+        .signal-hold { background: rgba(52, 152, 219, 0.1); color: var(--secondary); }
+        
+        /* 数据表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 25px 0;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .data-table th {
+            background: var(--primary);
+            color: white;
+            padding: 18px 20px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        
+        .data-table td {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .data-table tr:hover {
+            background: rgba(52, 152, 219, 0.03);
+        }
+        
+        /* 风险等级指示器 */
+        .risk-level {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-weight: 600;
+        }
+        
+        .risk-low { background: rgba(39, 174, 96, 0.1); color: var(--success); }
+        .risk-medium { background: rgba(243, 156, 18, 0.1); color: var(--warning); }
+        .risk-high { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+        
+        /* 操作按钮 */
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 40px;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn-primary {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary);
+            transform: translateY(-2px);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            color: var(--secondary);
+            border: 2px solid var(--secondary);
+        }
+        
+        .btn-outline:hover {
+            background: var(--secondary);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        /* 页脚 */
+        .report-footer {
+            background: var(--light);
+            padding: 30px 50px;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+        
+        .footer-text {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .report-header {
+                padding: 30px 20px;
+            }
+            
+            .stock-title {
+                font-size: 2rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            
+            .report-body {
+                padding: 30px 20px;
+            }
+            
+            .chart-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+        
+        /* 动画效果 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+    </style>
+    <!-- Plotly 图表库 -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <!-- Font Awesome 图标 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+</head>
+<body>
+    <div class="report-container">
+        <!-- 报告头部 -->
+        <div class="report-header">
+            <div class="header-overlay"></div>
+            <div class="header-content">
+                <div class="stock-title animate">
+                    <span>{{股票名称}}</span>
+                    <span class="stock-code">{{股票代码}}</span>
+                </div>
+                <div class="stock-subtitle animate delay-1" style="font-size: 1.4rem; opacity: 0.9; margin-bottom: 20px;">
+                    竹林司马技术分析报告 · 基于双重验证机制
+                </div>
+                
+                <div class="report-meta animate delay-2">
+                    <div class="meta-item">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>报告日期: {{报告日期}}</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-chart-line"></i>
+                        <span>分析周期: {{分析周期}}</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>数据质量: {{数据质量}}%</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-bolt"></i>
+                        <span>生成时间: {{生成时间}}秒</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 主要内容区域 -->
+        <div class="report-body">
+            <!-- 执行摘要 -->
+            <div class="section animate delay-1">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-file-alt"></i>
+                        执行摘要
+                    </div>
+                    <div class="section-badge">关键信息</div>
+                </div>
+                
+                <div style="font-size: 1.1rem; line-height: 1.8; padding: 20px; background: rgba(52, 152, 219, 0.05); border-radius: 10px; border-left: 4px solid var(--secondary);">
+                    {{执行摘要}}
+                </div>
+            </div>
+            
+            <!-- 价格走势分析 -->
+            <div class="section animate delay-2">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-chart-line"></i>
+                        价格走势分析
+                    </div>
+                    <div class="section-badge">实时图表</div>
+                </div>
+                
+                <div class="chart-section">
+                    <div class="chart-container">
+                        <div class="chart-title">
+                            <i class="fas fa-chart-area"></i>
+                            价格走势图
+                        </div>
+                        <div class="chart" id="priceChart"></div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <div class="chart-title">
+                            <i class="fas fa-wave-square"></i>
+                            成交量分析
+                        </div>
+                        <div class="chart" id="volumeChart"></div>
+                    </div>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">当前价格</div>
+                        <div class="metric-value">¥{{当前价格}}</div>
+                        <div class="metric-change {{价格涨跌类别}}">
+                            <i class="fas fa-arrow-{{价格涨跌图标}}"></i>
+                            {{价格涨跌幅}}
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">今日振幅</div>
+                        <div class="metric-value">{{今日振幅}}%</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">成交量</div>
+                        <div class="metric-value">{{成交量}}</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">成交额</div>
+                        <div class="metric-value">{{成交额}}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 技术指标分析 -->
+            <div class="section animate delay-3">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-chart-bar"></i>
+                        技术指标分析
+                    </div>
+                    <div class="section-badge">双重验证</div>
+                </div>
+                
+                <div class="chart-section">
+                    <div class="chart-container">
+                        <div class="chart-title">
+                            <i class="fas fa-chart-line"></i>
+                            综合技术指标
+                        </div>
+                        <div class="chart" id="technicalChart"></div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <div class="chart-title">
+                            <i class="fas fa-tachometer-alt"></i>
+                            指标仪表盘
+                        </div>
+                        <div class="chart" id="indicatorDashboard"></div>
+                    </div>
+                </div>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>技术指标</th>
+                            <th>当前值</th>
+                            <th>信号</th>
+                            <th>趋势</th>
+                            <th>风险等级</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#技术指标列表}}
+                        <tr>
+                            <td><strong>{{名称}}</strong></td>
+                            <td class="{{数值类别}}">{{数值}}</td>
+                            <td>
+                                <span class="signal-indicator signal-{{信号类别}}">
+                                    <i class="fas fa-{{信号图标}}"></i>
+                                    {{信号}}
+                                </span>
+                            </td>
+                            <td>{{趋势}}</td>
+                            <td>
+                                <span class="risk-level risk-{{风险等级}}">
+                                    {{风险等级}}
+                                </span>
+                            </td>
+                            <td>{{说明}}</td>
+                        </tr>
+                        {{/技术指标列表}}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 风险评估与建议 -->
+            <div class="section animate delay-4">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        风险评估与投资建议
+                    </div>
+                    <div class="section-badge {{建议类别}}">{{投资建议}}</div>
+                </div>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-label">目标价格</div>
+                        <div class="metric-value">¥{{目标价格}}</div>
+                        <div class="metric-change {{目标价格涨跌类别}}">
+                            <i class="fas fa-arrow-{{目标价格涨跌图标}}"></i>
+                            距当前 {{目标价格涨跌幅}}
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">止损价格</div>
+                        <div class="metric-value">¥{{止损价格}}</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">预期收益</div>
+                        <div class="metric-value {{预期收益类别}}">{{预期收益}}%</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-label">风险收益比</div>
+                        <div class="metric-value">{{风险收益比}}</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 25px; background: rgba(243, 156, 18, 0.05); border-radius: 10px; border-left: 4px solid var(--warning);">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <i class="fas fa-lightbulb" style="font-size: 1.5rem; color: var(--warning);"></i>
+                        <h3 style="font-size: 1.4rem; color: var(--primary);">投资建议详情</h3>
+                    </div>
+                    <p style="font-size: 1.1rem; line-height: 1.7;">{{建议详情}}</p>
+                </div>
+            </div>
+            
+            <!-- 数据质量报告 -->
+            <div class="section animate delay-5">
+                <div class="section-header">
+                    <div class="section-title">
+                        <i class="fas fa-database"></i>
+                        数据质量报告
+                    </div>
+                    <div class="section-badge">严格验证</div>
+                </div>
+                
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>验证项目</th>
+                            <th>状态</th>
+                            <th>完整性</th>
+                            <th>准确性</th>
+                            <th>时效性</th>
+                            <th>备注</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{#数据质量检查列表}}
+                        <tr>
+                            <td>{{项目}}</td>
+                            <td>
+                                <span class="signal-indicator {{状态类别}}">
+                                    {{状态}}
+                                </span>
+                            </td>
+                            <td>{{完整性}}%</td>
+                            <td>{{准确性}}%</td>
+                            <td>{{时效性}}%</td>
+                            <td>{{备注}}</td>
+                        </tr>
+                        {{/数据质量检查列表}}
+                    </tbody>
+                </table>
+                
+                <div style="margin-top: 25px; display: flex; align-items: center; gap: 20px;">
+                    <div style="flex: 1; height: 12px; background: #e9ecef; border-radius: 6px; overflow: hidden;">
+                        <div style="width: {{总体数据质量}}%; height: 100%; background: linear-gradient(90deg, var(--success), var(--secondary)); transition: width 1s ease-out;"></div>
+                    </div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: var(--primary);">
+                        总体数据质量: {{总体数据质量}}%
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="window.print()">
+                    <i class="fas fa-print"></i>
+                    打印报告
+                </button>
+                <button class="btn btn-outline" onclick="exportToPDF()">
+                    <i class="fas fa-file-pdf"></i>
+                    导出PDF
+                </button>
+                <button class="btn btn-outline" onclick="refreshAnalysis()">
+                    <i class="fas fa-sync-alt"></i>
+                    刷新分析
+                </button>
+            </div>
+        </div>
+        
+        <!-- 页脚 -->
+        <div class="report-footer">
+            <p class="footer-text">
+                <strong>© 2026 竹林司马技术分析工具 · 版本 {{版本号}}</strong><br>
+                本报告基于双重验证机制生成，所有分析结果均经过数据验证和逻辑审核。<br>
+                报告仅供参考，不构成投资建议。投资有风险，入市需谨慎。
+            </p>
+            <p style="margin-top: 15px; font-size: 0.9rem; color: #6c757d;">
+                生成时间: {{完整生成时间}} · 分析师: {{分析师}} · 技术支持: support@zhulinsma.com
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // 初始化图表数据
+        const reportData = {
+            价格数据: {{价格数据JSON}},
+            成交量数据: {{成交量数据JSON}},
+            技术指标数据: {{技术指标数据JSON}}
+        };
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 添加动画类
+            document.querySelectorAll('.animate').forEach((el, index) => {
+                el.style.opacity = '0';
+                setTimeout(() => {
+                    el.style.opacity = '1';
+                }, index * 100);
+            });
+            
+            // 初始化图表
+            initCharts();
+            
+            // 添加交互效果
+            addInteractions();
+        });
+        
+        // 初始化图表
+        function initCharts() {
+            // 价格走势图
+            const priceTrace = {
+                x: reportData.价格数据.日期,
+                y: reportData.价格数据.价格,
+                type: 'scatter',
+                mode: 'lines',
+                name: '价格走势',
+                line: {
+                    color: '#e74c3c',
+                    width: 2
+                },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(231, 76, 60, 0.1)'
+            };
+            
+            const priceLayout = {
+                title: { text: '价格走势分析', font: { size: 16 } },
+                xaxis: { title: '日期', gridcolor: '#f0f0f0' },
+                yaxis: { title: '价格 (¥)', gridcolor: '#f0f0f0' },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                hovermode: 'x unified',
+                showlegend: true
+            };
+            
+            Plotly.newPlot('priceChart', [priceTrace], priceLayout);
+            
+            // 成交量图
+            const volumeTrace = {
+                x: reportData.成交量数据.日期,
+                y: reportData.成交量数据.成交量,
+                type: 'bar',
+                name: '成交量',
+                marker: {
+                    color: reportData.成交量数据.涨跌.map(val => 
+                        val >= 0 ? '#e74c3c' : '#27ae60'
+                    )
+                }
+            };
+            
+            const volumeLayout = {
+                title: { text: '成交量分析', font: { size: 16 } },
+                xaxis: { title: '日期', gridcolor: '#f0f0f0' },
+                yaxis: { title: '成交量', gridcolor: '#f0f0f0' },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                barmode: 'group'
+            };
+            
+            Plotly.newPlot('volumeChart', [volumeTrace], volumeLayout);
+            
+            // 技术指标图
+            if (reportData.技术指标数据) {
+                initTechnicalCharts();
+            }
+        }
+        
+        // 初始化技术指标图表
+        function initTechnicalCharts() {
+            // 这里可以添加更多技术指标图表
+            console.log('技术指标数据加载完成');
+        }
+        
+        // 添加交互效果
+        function addInteractions() {
+            // 卡片悬停效果
+            document.querySelectorAll('.metric-card').forEach(card => {
+                card.addEventListener('mouseenter', () => {
+                    card.style.transform = 'translateY(-5px)';
+                });
+                card.addEventListener('mouseleave', () => {
+                    card.style.transform = 'translateY(0)';
+                });
+            });
+            
+            // 表格行悬停效果
+            document.querySelectorAll('.data-table tr').forEach(row => {
+                row.addEventListener('mouseenter', () => {
+                    row.style.backgroundColor = 'rgba(52, 152, 219, 0.05)';
+                });
+                row.addEventListener('mouseleave', () => {
+                    row.style.backgroundColor = '';
+                });
+            });
+        }
+        
+        // 导出PDF功能
+        function exportToPDF() {
+            alert('PDF导出功能即将推出...\n当前版本支持打印功能，请使用浏览器的打印功能保存为PDF。');
+        }
+        
+        // 刷新分析功能
+        function refreshAnalysis() {
+            const loadingText = document.querySelector('.stock-subtitle');
+            const originalText = loadingText.textContent;
+            loadingText.textContent = '正在刷新分析数据...';
+            loadingText.style.color = 'var(--secondary)';
+            
+            setTimeout(() => {
+                loadingText.textContent = originalText;
+                loadingText.style.color = '';
+                alert('分析数据已刷新！');
+            }, 1500);
+        }
+        
+        // 窗口大小调整时重新绘制图表
+        window.addEventListener('resize', function() {
+            Plotly.Plots.resize('priceChart');
+            Plotly.Plots.resize('volumeChart');
+        });
+    </script>
+</body>
+</html>

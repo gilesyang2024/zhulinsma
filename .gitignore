@@ -21,100 +21,38 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
+# Virtual Environments
 .env
 .venv
 env/
 venv/
 ENV/
-env.bak/
-venv.bak/
+ta_env/
+zhulinsma_env/
+easyxt_env/
 
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
 
-# Database
-*.db
-*.sqlite3
-*.sqlite
+# Cache
+.cache/
+测试缓存/
+实战数据缓存/
+*.pkl
 
 # Logs
 *.log
 logs/
 
-# Uploads
-uploads/
-!uploads/.gitkeep
+# Data files (sensitive)
+*.duckdb
 
-# Static files
-static/css/*.css
-static/js/*.js
-!static/css/*.min.css
-!static/js/*.min.js
-
-# Test coverage
-.coverage
-.coverage.*
-htmlcov/
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Environment variables
-.env
-!.env.example
-
-# Docker
-.dockerignore
-docker-compose.override.yml
-
-# macOS
+# OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Backups
-*.bak
-*.backup
-
-# Temporary files
-*.tmp
-*.temp
-
-# Documentation
-docs/_build/
-docs/site/
-
-# Local development
-local_settings.py
-local_config.yaml
-
-# Pre-commit
-.pre-commit-config.yaml
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# MinIO data
-minio_data/
-
-# PostgreSQL data
-postgres_data/
-
-# Redis data
-redis_data/
+# Test outputs
+test_output/
