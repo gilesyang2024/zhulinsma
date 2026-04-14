@@ -4,6 +4,7 @@
 提供Redis缓存连接、缓存操作和多级缓存策略。
 """
 
+import asyncio
 import json
 import logging
 import pickle

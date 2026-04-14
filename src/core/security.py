@@ -572,3 +572,24 @@ async def check_security_health() -> Dict[str, Any]:
             "status": "unhealthy",
             "message": f"安全模块异常: {str(e)}",
         }
+
+
+async def get_current_superuser(user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """
+    获取当前超级管理员用户
+    
+    Args:
+        user: 当前用户
+        
+    Returns:
+        超级管理员用户信息
+        
+    Raises:
+        HTTPException: 不是超级管理员
+    """
+    if not user.get("is_superuser", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要超级管理员权限",
+        )
+    return user

@@ -15,11 +15,15 @@ from sqlalchemy import and_, or_, func, desc, asc
 from sqlalchemy.orm import Session
 
 from src.core.database import get_db
-from src.core.security import security, get_current_user
+from src.core.security import security, get_current_user, get_current_user_optional, require_admin, get_current_superuser
 from src.core.exceptions import (
     AuthenticationError, AuthorizationError, AlreadyExistsError, 
     NotFoundError, ValidationError
 )
+from src.core.decorators import audit_log, rate_limit
+
+# 别名：管理员用户获取函数
+get_current_admin_user = require_admin
 
 from src.models.user import User, Role, UserRole, UserSettings, UserStatistics
 from src.schemas.v1.user import (

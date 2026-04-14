@@ -10,8 +10,8 @@ UUID兼容性模块
 
 import uuid
 from typing import Any, Optional, Union
-from sqlalchemy import types, Column, Integer, String
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import types, Column, Integer, String, JSON
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB as PG_JSONB
 from sqlalchemy.dialects.sqlite import BLOB
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.dialects import postgresql, sqlite
@@ -127,6 +127,39 @@ class GUID(TypeDecorator):
 
     def __repr__(self):
         return "GUID()"
+
+
+class JSONB(TypeDecorator):
+    """
+    跨数据库的JSONB类型实现
+    
+    支持：
+    - PostgreSQL: 使用原生JSONB类型
+    - SQLite/其他数据库: 使用JSON类型存储
+    """
+    
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        """根据数据库方言选择合适的类型实现"""
+        if dialect.name == "postgresql":
+            # PostgreSQL使用原生JSONB类型
+            return dialect.type_descriptor(PG_JSONB())
+        else:
+            # SQLite和其他数据库使用JSON类型
+            return dialect.type_descriptor(JSON())
+
+    def process_bind_param(self, value, dialect):
+        """将Python值转换为数据库值"""
+        return value
+
+    def process_result_value(self, value, dialect):
+        """将数据库值转换为Python对象"""
+        return value
+
+    def __repr__(self):
+        return "JSONB()"
 
 
 def create_uuid() -> uuid.UUID:

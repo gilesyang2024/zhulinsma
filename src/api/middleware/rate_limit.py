@@ -6,15 +6,39 @@
 
 import time
 import logging
-from typing import Optional, Dict, Any
-from fastapi import Request, HTTPException, status
+import functools
+from typing import Optional, Dict, Any, Callable
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 
 from src.core.config import settings
 from src.core.cache import cache
 from src.core.exceptions import RateLimitExceededError
+from src.core.security import get_current_user_optional
+from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
+
+# 测试路由（仅开发环境）
+router = APIRouter(prefix="/rate-limit", tags=["rate-limit"])
+
+
+def rate_limit(key: str, limit: int = 60, period: int = 60):
+    """
+    速率限制装饰器
+    
+    Args:
+        key: 限制键名
+        limit: 请求限制次数
+        period: 时间周期（秒）
+    """
+    def decorator(func: Callable):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            # 装饰器暂时不执行实际限制，由中间件统一处理
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class RateLimiter:

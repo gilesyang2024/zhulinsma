@@ -3,7 +3,7 @@ name = "zhulinsma-backend"
 version = "1.0.0"
 description = "竹林司马内容管理系统后端"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
     {name = "竹林司马团队", email = "team@zhulinsma.com"}
@@ -33,6 +33,7 @@ dependencies = [
     "python-multipart==0.0.6",
     "pydantic==2.5.0",
     "pydantic-settings==2.1.0",
+    "email-validator==2.1.0",
     "python-magic==0.4.27",
     "pillow==10.1.0",
     "httpx==0.25.1",
@@ -42,6 +43,17 @@ dependencies = [
     "prometheus-client==0.19.0",
     "structlog==23.2.0",
     "sentry-sdk==1.38.0",
+    # 存储相关
+    "boto3==1.33.7",
+    "aiofiles==23.2.1",
+    # 缓存相关
+    "cachetools==5.3.2",
+    # WebSocket
+    "websockets==12.0",
+    # 选股战法（akshare数据源）
+    "akshare>=1.12.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]

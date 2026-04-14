@@ -294,7 +294,7 @@ def vectorized_ATR(high: Union[np.ndarray, pd.Series],
     
     # 使用向量化SMA计算ATR
     atr_values = vectorized_SMA(true_range, period)
-    atr[period:] = atr_values[period-1:-1]
+    atr[period:] = atr_values[period - 1:]
     
     return atr
 
@@ -586,6 +586,188 @@ class OptimizedTechnicalIndicators:
         
         return result
     
+    def BollingerBands(self, 价格: Union[pd.Series, np.ndarray], 
+                       period: int = 20, std_dev: float = 2.0,
+                       使用缓存: bool = True) -> Dict[str, np.ndarray]:
+        """
+        优化布林带计算
+        
+        参数:
+            价格: 价格序列
+            period: 移动平均周期 (默认: 20)
+            std_dev: 标准差倍数 (默认: 2.0)
+            使用缓存: 是否使用缓存加速重复计算 (默认: True)
+        
+        返回:
+            包含中轨、上轨、下轨、带宽、价格位置的字典
+        """
+        cache_key = self._get_cache_key('BollingerBands', 价格, period, std_dev) if 使用缓存 else None
+        
+        if 使用缓存 and cache_key in self.缓存:
+            self.性能统计['cache_hits'] += 1
+            return self.缓存[cache_key]
+        
+        self.性能统计['cache_misses'] += 1
+        
+        if isinstance(价格, pd.Series):
+            价格数据 = 价格.values
+        else:
+            价格数据 = np.array(价格, dtype=np.float64)
+        
+        result = vectorized_BollingerBands(价格数据, period, std_dev)
+        
+        if self.验证模式:
+            self._验证BollingerBands(价格数据, result, period, std_dev)
+        
+        if 使用缓存 and cache_key is not None:
+            if len(self.缓存) >= self.缓存大小:
+                oldest_key = next(iter(self.缓存))
+                del self.缓存[oldest_key]
+            self.缓存[cache_key] = result
+        
+        self.计算历史.append({
+            '操作': '布林带计算',
+            '周期': period,
+            '标准差倍数': std_dev,
+            '数据长度': len(价格数据),
+            '优化模式': self.优化模式,
+            '缓存使用': 使用缓存
+        })
+        
+        return result
+    
+    def ATR(self, 最高价: Union[pd.Series, np.ndarray], 
+            最低价: Union[pd.Series, np.ndarray], 
+            收盘价: Union[pd.Series, np.ndarray], 
+            period: int = 14, 使用缓存: bool = True) -> np.ndarray:
+        """
+        优化ATR计算
+        
+        参数:
+            最高价: 最高价序列
+            最低价: 最低价序列
+            收盘价: 收盘价序列
+            period: ATR周期 (默认: 14)
+            使用缓存: 是否使用缓存加速重复计算 (默认: True)
+        
+        返回:
+            ATR值数组
+        """
+        cache_key = self._get_cache_key('ATR', 最高价, 最低价, 收盘价, period) if 使用缓存 else None
+        
+        if 使用缓存 and cache_key in self.缓存:
+            self.性能统计['cache_hits'] += 1
+            return self.缓存[cache_key]
+        
+        self.性能统计['cache_misses'] += 1
+        
+        if isinstance(最高价, pd.Series):
+            高 = 最高价.values
+        else:
+            高 = np.array(最高价, dtype=np.float64)
+        if isinstance(最低价, pd.Series):
+            低 = 最低价.values
+        else:
+            低 = np.array(最低价, dtype=np.float64)
+        if isinstance(收盘价, pd.Series):
+            收 = 收盘价.values
+        else:
+            收 = np.array(收盘价, dtype=np.float64)
+        
+        result = vectorized_ATR(高, 低, 收, period)
+        
+        if self.验证模式:
+            self._验证ATR(高, 低, 收, result, period)
+        
+        if 使用缓存 and cache_key is not None:
+            if len(self.缓存) >= self.缓存大小:
+                oldest_key = next(iter(self.缓存))
+                del self.缓存[oldest_key]
+            self.缓存[cache_key] = result
+        
+        self.计算历史.append({
+            '操作': 'ATR计算',
+            '周期': period,
+            '数据长度': len(收),
+            '优化模式': self.优化模式,
+            '缓存使用': 使用缓存
+        })
+        
+        return result
+    
+    def Stochastic(self, 最高价: Union[pd.Series, np.ndarray], 
+                  最低价: Union[pd.Series, np.ndarray], 
+                  收盘价: Union[pd.Series, np.ndarray],
+                  k_period: int = 14, d_period: int = 3,
+                  使用缓存: bool = True) -> Dict[str, np.ndarray]:
+        """
+        优化随机指标计算
+        
+        参数:
+            最高价: 最高价序列
+            最低价: 最低价序列
+            收盘价: 收盘价序列
+            k_period: K线周期 (默认: 14)
+            d_period: D线周期 (默认: 3)
+            使用缓存: 是否使用缓存加速重复计算 (默认: True)
+        
+        返回:
+            包含K线和D线的字典
+        """
+        cache_key = self._get_cache_key('Stochastic', 最高价, 最低价, 收盘价, k_period, d_period) if 使用缓存 else None
+        
+        if 使用缓存 and cache_key in self.缓存:
+            self.性能统计['cache_hits'] += 1
+            return self.缓存[cache_key]
+        
+        self.性能统计['cache_misses'] += 1
+        
+        if isinstance(最高价, pd.Series):
+            高 = 最高价.values
+        else:
+            高 = np.array(最高价, dtype=np.float64)
+        if isinstance(最低价, pd.Series):
+            低 = 最低价.values
+        else:
+            低 = np.array(最低价, dtype=np.float64)
+        if isinstance(收盘价, pd.Series):
+            收 = 收盘价.values
+        else:
+            收 = np.array(收盘价, dtype=np.float64)
+        
+        # 计算%K
+        n = len(收)
+        k_values = np.full(n, np.nan, dtype=np.float64)
+        for i in range(k_period - 1, n):
+            low_min = np.min(低[i - k_period + 1:i + 1])
+            high_max = np.max(高[i - k_period + 1:i + 1])
+            k_values[i] = 100.0 * (收[i] - low_min) / (high_max - low_min + 1e-10)
+        
+        # 计算%D（K线的SMA）
+        d_values = efficient_SMA(k_values, d_period)
+        
+        result = {'k': k_values, 'd': d_values}
+        
+        if self.验证模式:
+            self._验证随机指标(高, 低, 收, result, k_period, d_period)
+        
+        if 使用缓存 and cache_key is not None:
+            if len(self.缓存) >= self.缓存大小:
+                oldest_key = next(iter(self.缓存))
+                del self.缓存[oldest_key]
+            self.缓存[cache_key] = result
+        
+        self.计算历史.append({
+            '操作': '随机指标计算',
+            'K周期': k_period,
+            'D周期': d_period,
+            '数据长度': n,
+            '优化模式': self.优化模式,
+            '缓存使用': 使用缓存
+        })
+        
+        return result
+    
     def MACD(self, 价格: Union[pd.Series, np.ndarray], 
              fast: int = 12, slow: int = 26, signal: int = 9, 
              使用缓存: bool = True) -> Dict[str, np.ndarray]:
@@ -675,11 +857,11 @@ class OptimizedTechnicalIndicators:
                     results[indicator] = self.RSI(价格数据, period, 使用缓存=False)
                 elif indicator == 'MACD':
                     results[indicator] = self.MACD(价格数据, 使用缓存=False)
-                elif indicator == 'BB':
+                elif indicator == 'BB' or indicator == 'BollingerBands':
                     results[indicator] = vectorized_BollingerBands(价格数据)
                 elif indicator == 'ATR':
-                    # 需要高、低、收盘价，这里简化处理
-                    results[indicator] = np.zeros_like(价格数据)
+                    # 需要高、低、收盘价，若无则返回NaN占位
+                    results[indicator] = np.full(len(价格数据), np.nan)
         
         return results
     
@@ -796,6 +978,60 @@ class OptimizedTechnicalIndicators:
             print(f"✅ MACD({fast},{slow},{signal}) 计算完成")
         except Exception as e:
             print(f"⚠️ MACD验证异常: {e}")
+    
+    def _验证BollingerBands(self, 价格: np.ndarray, bb: Dict, period: int, std_dev: float):
+        """验证布林带计算结果"""
+        try:
+            if 'middle' in bb and 'upper' in bb and 'lower' in bb:
+                有效 = ~np.isnan(bb['middle'])
+                if np.any(有效):
+                    # 检查上下轨关系
+                    有效_idx = np.where(有效)[0]
+                    if len(有效_idx) > 0:
+                        上大于中 = np.all(bb['upper'][有效_idx] >= bb['middle'][有效_idx])
+                        中大于下 = np.all(bb['middle'][有效_idx] >= bb['lower'][有效_idx])
+                        if 上大于中 and 中大于下:
+                            print(f"✅ BollingerBands({period},{std_dev}) 验证通过")
+                        else:
+                            print(f"⚠️ BollingerBands 验证警告: 轨道关系不正确")
+        except Exception as e:
+            print(f"⚠️ BollingerBands验证异常: {e}")
+    
+    def _验证随机指标(self, 最高价: np.ndarray, 最低价: np.ndarray, 收盘价: np.ndarray,
+                    stoch: Dict, k_period: int, d_period: int):
+        """验证随机指标计算结果"""
+        try:
+            if 'k' in stoch and 'd' in stoch:
+                有效k = np.sum(~np.isnan(stoch['k']))
+                有效d = np.sum(~np.isnan(stoch['d']))
+                if 有效k > 0 and 有效d > 0:
+                    # 检查K值范围 0-100
+                    有效K = stoch['k'][~np.isnan(stoch['k'])]
+                    if np.all(有效K >= 0) and np.all(有效K <= 100):
+                        print(f"✅ Stochastic({k_period},{d_period}) 验证通过")
+                    else:
+                        print(f"⚠️ Stochastic K值超出范围 [0,100]")
+                else:
+                    print(f"⚠️ Stochastic 验证警告: 有效数据不足")
+        except Exception as e:
+            print(f"⚠️ Stochastic验证异常: {e}")
+    
+    def _验证ATR(self, 最高价: np.ndarray, 最低价: np.ndarray, 收盘价: np.ndarray,
+                atr: np.ndarray, period: int):
+        """验证ATR计算结果"""
+        try:
+            有效atr = np.sum(~np.isnan(atr))
+            if 有效atr > 0:
+                有效值 = atr[~np.isnan(atr)]
+                # ATR 应为正数
+                if np.all(有效值 > 0):
+                    print(f"✅ ATR({period}) 验证通过")
+                else:
+                    print(f"⚠️ ATR 验证警告: 存在非正值")
+            else:
+                print(f"⚠️ ATR 验证警告: 无有效数据")
+        except Exception as e:
+            print(f"⚠️ ATR验证异常: {e}")
     
     def 获取性能统计(self) -> Dict[str, Any]:
         """获取性能统计信息"""
@@ -1011,8 +1247,8 @@ def 综合技术分析(股票数据, 股票代码="测试股票", 优化模式="
                 'SMA_60': float(技术指标['SMA_60'][-1]) if not np.isnan(技术指标['SMA_60'][-1]) else None
             },
             '指数移动平均线': {
-                'EMA_12': float(技术指标['EMA_12'][-1]),
-                'EMA_26': float(技术指标['EMA_26'][-1])
+                'EMA_12': float(技术指标['EMA_12'][-1]) if not np.isnan(技术指标['EMA_12'][-1]) else None,
+                'EMA_26': float(技术指标['EMA_26'][-1]) if not np.isnan(技术指标['EMA_26'][-1]) else None
             },
             '相对强弱指数': {
                 'RSI_14': float(技术指标['RSI_14'][-1]) if not np.isnan(技术指标['RSI_14'][-1]) else None

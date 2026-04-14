@@ -44,6 +44,10 @@ class Settings:
         self.REDIS_PASSWORD = self._get_env("REDIS_PASSWORD", None)
         self.REDIS_POOL_SIZE = self._get_env_int("REDIS_POOL_SIZE", 5)
         
+        # Redis集群配置（可选，默认单节点模式）
+        self.REDIS_CLUSTER_ENABLED = self._get_env_bool("REDIS_CLUSTER_ENABLED", False)
+        self.REDIS_CLUSTER_NODES = self._get_env_list("REDIS_CLUSTER_NODES", [])
+        
         # JWT配置
         self.JWT_SECRET_KEY = self._get_env("JWT_SECRET_KEY", "development-jwt-secret-key-must-be-32-chars")
         self.JWT_ALGORITHM = self._get_env("JWT_ALGORITHM", "HS256")
@@ -59,6 +63,12 @@ class Settings:
         self.LOG_LEVEL = self._get_env("LOG_LEVEL", "INFO")
         self.LOG_FORMAT = self._get_env("LOG_FORMAT", "json")
         self.LOG_FILE = self._get_env("LOG_FILE", "./logs/app.log")
+        
+        # 速率限制配置
+        self.RATE_LIMIT_ENABLED = self._get_env_bool("RATE_LIMIT_ENABLED", False)
+        self.RATE_LIMIT_DEFAULT = self._get_env("RATE_LIMIT_DEFAULT", "60/minute")
+        self.RATE_LIMIT_AUTH = self._get_env("RATE_LIMIT_AUTH", "5/minute")
+        self.RATE_LIMIT_UPLOAD = self._get_env("RATE_LIMIT_UPLOAD", "10/minute")
         
         # 验证密钥长度
         if len(self.APP_SECRET_KEY) < 32:

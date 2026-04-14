@@ -8,7 +8,7 @@ import logging
 import os
 import shutil
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path as PathlibPath
 from typing import Optional, List, Dict, Any
 from uuid import UUID, uuid4
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/media", tags=["media"])
 
 # 确保上传目录存在
-UPLOAD_DIR = Path(settings.UPLOAD_DIR) if hasattr(settings, 'UPLOAD_DIR') else Path("uploads")
+UPLOAD_DIR = PathlibPath(settings.FILE_STORAGE_PATH) if hasattr(settings, 'FILE_STORAGE_PATH') else PathlibPath("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

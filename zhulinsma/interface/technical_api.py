@@ -21,7 +21,10 @@ from typing import Dict, List, Tuple, Union, Optional, Any
 # 导入竹林司马核心工具
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 上溯到项目根目录: interface/ → zhulinsma/ → zhulinsma/ (项目根)
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 try:
     from zhulinsma_tool import 竹林司马
     from zhulinsma_tool_v2 import 竹林司马V2

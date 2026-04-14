@@ -1,12 +1,33 @@
-# 开发依赖
+# 竹林司马 - 开发和测试依赖
+# 从 pyproject.toml [project.optional-dependencies] dev 组生成
+
+# 测试框架
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 pytest-mock==3.12.0
+httpx==0.25.1
+
+# 代码格式化
 black==23.11.0
 isort==5.12.0
+
+# 代码检查
 flake8==6.1.0
 mypy==1.7.0
+flake8-docstrings==1.7.0
+
+# Git钩子
 pre-commit==3.5.0
+
+# 文档生成
 mkdocs==1.5.3
 mkdocs-material==9.4.6
+
+# 安全扫描
+bandit==1.7.5
+safety==2.3.4
+
+# 性能分析
+memory-profiler==0.61.0
+py-spy==0.3.14

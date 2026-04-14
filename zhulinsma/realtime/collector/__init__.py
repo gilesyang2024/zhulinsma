@@ -153,12 +153,18 @@ class RealtimeCollector:
                     symbol = code.split(".")[0]
                     df = ak.stock_bid_ask_em(symbol=symbol)
                     if df is not None and not df.empty:
-                        价格 = float(df[df["item"] == "最新"]["value"].values[0])
+                        def _get(item: str) -> float:
+                            row = df[df["item"] == item]
+                            return float(row["value"].values[0]) if not row.empty else 0.0
+
+                        最新价 = _get("最新")
+                        昨收 = _get("昨收")
                         tick = TickData(
                             ts_code=code,
-                            price=价格,
-                            volume=0,
-                            amount=0,
+                            price=最新价,
+                            volume=int(_get("总手") * 100),  # 总手→股数
+                            amount=_get("金额"),
+                            prev_close=昨收,
                         )
                         ticks.append(tick)
                 except Exception as e:

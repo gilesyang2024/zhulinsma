@@ -13,19 +13,54 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # ─────────────────────────────────────────────────────────────────
-# 模拟国电南瑞近60日行情数据（实际使用时请对接 akshare/tushare）
+# 国电南瑞真实行情数据（使用 akshare 获取）
 # ─────────────────────────────────────────────────────────────────
-STOCK_CODE = "600406.SH"
+STOCK_CODE = "600406"
 STOCK_NAME = "国电南瑞"
 
-# 模拟价格（基于真实水平构造，仅供演示）
-np.random.seed(20260327)
-基础价格 = 28.5
-收盘价序列 = 基础价格 + np.cumsum(np.random.randn(60) * 0.3)
-收盘价序列 = np.clip(收盘价序列, 24.0, 36.0)
-最高价序列 = 收盘价序列 + np.abs(np.random.randn(60)) * 0.3
-最低价序列 = 收盘价序列 - np.abs(np.random.randn(60)) * 0.3
-成交量序列 = np.abs(np.random.randn(60)) * 5000000 + 8000000
+def load_real_data():
+    """使用 akshare 获取真实日K数据"""
+    try:
+        import akshare as ak
+        market_code = "sh"  # 沪市
+        symbol = f"{market_code}{STOCK_CODE}"
+        df = ak.stock_zh_a_hist(
+            symbol=symbol,
+            period="daily",
+            start_date="20250101",
+            end_date="20260414",
+            adjust="qfq",
+        )
+        # 统一列名
+        df = df.rename(columns={
+            "日期": "date", "开盘": "open", "收盘": "close",
+            "最高": "high", "最低": "low", "成交量": "volume", "成交额": "amount",
+        })
+        print(f"[数据] 成功获取真实行情 {len(df)} 条（{df['date'].iloc[0]} ~ {df['date'].iloc[-1]}）")
+        return df
+    except Exception as e:
+        print(f"[数据] akshare 获取失败（{e}），使用模拟数据")
+        return None
+
+df = load_real_data()
+
+if df is not None:
+    收盘价序列 = np.array(df["close"].values, dtype=float)
+    最高价序列 = np.array(df["high"].values, dtype=float)
+    最低价序列 = np.array(df["low"].values, dtype=float)
+    成交量序列 = np.array(df["volume"].values, dtype=float)
+    开盘价序列 = np.array(df["open"].values, dtype=float)
+else:
+    # 降级：模拟数据（保留原有逻辑）
+    np.random.seed(20260327)
+    基础价格 = 28.5
+    收盘价序列 = 基础价格 + np.cumsum(np.random.randn(60) * 0.3)
+    收盘价序列 = np.clip(收盘价序列, 24.0, 36.0)
+    最高价序列 = 收盘价序列 + np.abs(np.random.randn(60)) * 0.3
+    最低价序列 = 收盘价序列 - np.abs(np.random.randn(60)) * 0.3
+    成交量序列 = np.abs(np.random.randn(60)) * 5000000 + 8000000
+    开盘价序列 = 收盘价序列  # 近似
+
 
 
 def 打印分隔线(title: str = "", width: int = 65):

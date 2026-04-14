@@ -1,120 +1,113 @@
+#!/usr/bin/env python3
 """
-竹林司马后端应用主入口
+竹林司马 FastAPI 后端入口
 
-FastAPI应用实例和启动配置。
+启动方式:
+    uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    python main.py
 """
 
 import logging
+import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
+from typing import AsyncGenerator
 
-import uvicorn
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from prometheus_client import make_asgi_app
 
 from src.core.config import settings
+from src.core.database import db
 from src.core.exceptions import register_exception_handlers
-from src.core.database import db, check_database_health
-from src.core.cache import cache, check_cache_health
-from src.core.security import check_security_health
 from src.api.v1 import api_router
 
-# 导入OpenAPI配置
-try:
-    from docs.openapi_config import get_openapi_config, customize_openapi_schema
-    ENABLE_ENHANCED_DOCS = True
-except ImportError:
-    ENABLE_ENHANCED_DOCS = False
-
-# 配置日志
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
+# ─────────────────────────────────────────────
+# 生命周期管理
+# ─────────────────────────────────────────────
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """应用生命周期管理器
-    
-    Args:
-        app: FastAPI应用实例
-    """
-    # 启动时
-    logger.info(f"启动 {settings.APP_NAME} v{settings.APP_VERSION}")
-    logger.info(f"环境: {settings.APP_ENV}, 调试: {settings.APP_DEBUG}")
-    
-    # 连接数据库
+async def lifespan(app: FastAPI) -> AsyncGenerator:
+    """应用启动/关闭生命周期"""
+    # ── 启动 ──
+    logger.info("=" * 60)
+    logger.info(f"  {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"  环境: {settings.APP_ENV}")
+    logger.info("=" * 60)
+
+    # 数据库连接
     try:
         await db.connect()
-        logger.info("数据库连接成功")
+        await db.create_all()
+        logger.info("数据库初始化完成")
     except Exception as e:
-        logger.error(f"数据库连接失败: {e}")
-        raise
-    
-    # 连接缓存
+        logger.warning(f"数据库初始化跳过（可选）: {e}")
+
+    # 选股战法引擎预热
     try:
-        await cache.connect()
-        logger.info("缓存连接成功")
+        from src.api.v1.stock import get_engine, get_stock_fetcher, get_indicator
+        engine = get_engine()
+        logger.info(f"选股战法引擎就绪，已注册 {len(engine.list_strategies())} 个战法")
     except Exception as e:
-        logger.error(f"缓存连接失败: {e}")
-        # 缓存连接失败不阻止应用启动
-    
+        logger.warning(f"选股战法引擎初始化跳过: {e}")
+
+    logger.info("服务启动完成，开始接受请求")
+
     yield
-    
-    # 关闭时
-    logger.info("正在关闭应用...")
-    
-    # 断开缓存连接
-    try:
-        await cache.disconnect()
-        logger.info("缓存连接已断开")
-    except Exception as e:
-        logger.error(f"缓存断开失败: {e}")
-    
-    # 断开数据库连接
+
+    # ── 关闭 ──
+    logger.info("正在关闭服务...")
     try:
         await db.disconnect()
-        logger.info("数据库连接已断开")
-    except Exception as e:
-        logger.error(f"数据库断开失败: {e}")
-    
-    logger.info("应用已关闭")
+        logger.info("数据库连接已关闭")
+    except Exception:
+        pass
+    logger.info("服务已关闭")
 
 
-# 创建FastAPI应用实例
-app_kwargs = {
-    "title": settings.PROJECT_NAME,
-    "version": settings.APP_VERSION,
-    "description": "竹林司马内容管理系统的后端API",
-    "docs_url": "/api/docs" if settings.is_development else None,
-    "redoc_url": "/api/redoc" if settings.is_development else None,
-    "openapi_url": "/api/openapi.json" if settings.is_development else None,
-    "lifespan": lifespan,
-}
+# ─────────────────────────────────────────────
+# 创建应用
+# ─────────────────────────────────────────────
 
-# 如果启用了增强文档，添加配置
-if ENABLE_ENHANCED_DOCS:
-    openapi_config = get_openapi_config()
-    app_kwargs.update(openapi_config)
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    description="""
+    ## 竹林司马 (Zhulinsma) 后端 API
 
-app = FastAPI(**app_kwargs)
+    ### 核心模块
+    - **用户系统**: 注册/登录/JWT认证
+    - **选股战法**: 技术指标/策略分析/AI评分
+    - **内容管理**: CRUD/审核
+    - **推荐引擎**: 多策略融合推荐
+    - **监控系统**: 健康检查/Prometheus指标
+    - **数据分析**: 事件采集/留存/漏斗
 
-# 自定义OpenAPI schema
-if ENABLE_ENHANCED_DOCS:
-    @app.on_event("startup")
-    async def customize_openapi():
-        openapi_schema = app.openapi()
-        if openapi_schema:
-            app.openapi_schema = customize_openapi_schema(openapi_schema)
+    ### 选股战法模块
+    - `GET  /api/v1/stock/strategies` — 查询可用战法
+    - `POST /api/v1/stock/analyze` — 个股战法分析
+    - `GET  /api/v1/stock/realtime/{code}` — 实时行情
+    - `GET  /api/v1/stock/daily/{code}` — 日K数据
+    - `GET  /api/v1/stock/indicators/{code}` — 技术指标
+    - `GET  /api/v1/stock/limit-up` — 涨停板列表
+    - `POST /api/v1/stock/ai-score` — AI智能评分
+    - `POST /api/v1/stock/ai-recommend` — AI选股推荐
+    - `GET  /api/v1/stock/trend/{code}` — 趋势分析
+    - `GET  /api/v1/stock/risk/{code}` — 风险评估
+    """,
+    version=settings.APP_VERSION,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
 
-# 注册异常处理器
-register_exception_handlers(app)
 
-# 添加CORS中间件
+# ─────────────────────────────────────────────
+# 中间件
+# ─────────────────────────────────────────────
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.APP_CORS_ORIGINS,
@@ -123,161 +116,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 添加Prometheus指标应用
-metrics_app = make_asgi_app()
-app.mount("/metrics", metrics_app)
 
-# 注册API路由
-app.include_router(api_router, prefix=settings.API_PREFIX)
-
-
-@app.get("/", tags=["根路径"])
-async def root():
-    """根路径，返回应用信息"""
-    return {
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "environment": settings.APP_ENV,
-        "docs": "/api/docs" if settings.is_development else None,
-        "health": "/health",
-        "metrics": "/metrics",
-    }
-
-
-@app.get("/health", tags=["健康检查"])
-async def health_check():
-    """系统健康检查"""
-    # 并行检查各个组件
-    db_health = await check_database_health()
-    cache_health = await check_cache_health()
-    security_health = await check_security_health()
-    
-    # 确定总体状态
-    all_healthy = all([
-        db_health["status"] == "healthy",
-        cache_health["status"] == "healthy",
-        security_health["status"] == "healthy",
-    ])
-    
-    status_code = (
-        status.HTTP_200_OK if all_healthy 
-        else status.HTTP_503_SERVICE_UNAVAILABLE
-    )
-    
-    response = {
-        "status": "healthy" if all_healthy else "unhealthy",
-        "timestamp": datetime.now().isoformat(),
-        "components": {
-            "database": db_health,
-            "cache": cache_health,
-            "security": security_health,
-        },
-    }
-    
+# 全局异常处理
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"未处理异常 {request.url}: {exc}", exc_info=True)
     return JSONResponse(
-        status_code=status_code,
-        content=response,
+        status_code=500,
+        content={
+            "code": 500,
+            "message": "服务器内部错误",
+            "detail": str(exc) if settings.APP_DEBUG else "请稍后重试",
+        },
     )
 
 
-@app.get("/info", tags=["系统信息"])
-async def system_info():
-    """系统信息"""
-    import platform
-    import sys
-    
+# 注册自定义异常处理器
+try:
+    register_exception_handlers(app)
+except Exception:
+    pass
+
+
+# ─────────────────────────────────────────────
+# 路由注册
+# ─────────────────────────────────────────────
+
+app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+# ─────────────────────────────────────────────
+# 根路由
+# ─────────────────────────────────────────────
+
+@app.get("/", tags=["根"])
+async def root():
     return {
-        "app": {
-            "name": settings.APP_NAME,
-            "version": settings.APP_VERSION,
-            "environment": settings.APP_ENV,
-        },
-        "python": {
-            "version": sys.version,
-            "implementation": platform.python_implementation(),
-        },
-        "system": {
-            "platform": platform.platform(),
-            "processor": platform.processor(),
-        },
-        "api": {
-            "version": "v1",
-            "prefix": settings.API_PREFIX,
-            "docs": "/api/docs" if settings.is_development else None,
-        },
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "env": settings.APP_ENV,
+        "docs": "/docs",
+        "total_routes": len(app.routes),
     }
 
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    """请求日志中间件"""
-    # 记录请求开始
-    logger.info(
-        f"请求开始: {request.method} {request.url.path}",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "client": request.client.host if request.client else "unknown",
-            "user_agent": request.headers.get("user-agent"),
-        },
-    )
-    
-    # 处理请求
-    response = await call_next(request)
-    
-    # 记录请求结束
-    logger.info(
-        f"请求结束: {request.method} {request.url.path} - {response.status_code}",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": response.status_code,
-            "response_time_ms": 0,  # 实际应用中需要计算响应时间
-        },
-    )
-    
-    return response
-
-
-# 开发环境下的调试路由
-if settings.is_development:
-    
-    @app.get("/debug/config", tags=["调试"])
-    async def debug_config():
-        """调试配置信息（仅开发环境）"""
-        # 注意：不要暴露敏感信息如密码、密钥等
-        return {
-            "app": {
-                "name": settings.APP_NAME,
-                "env": settings.APP_ENV,
-                "debug": settings.APP_DEBUG,
-                "allowed_hosts": settings.APP_ALLOWED_HOSTS,
-            },
-            "api": {
-                "prefix": settings.API_PREFIX,
-                "v1_str": settings.API_V1_STR,
-            },
-            "database": {
-                "url": str(settings.DATABASE_URL).split("@")[0] + "@***",  # 隐藏密码
-                "pool_size": settings.DATABASE_POOL_SIZE,
-            },
-            "cache": {
-                "url": settings.REDIS_URL,
-                "pool_size": settings.REDIS_POOL_SIZE,
-            },
-            "jwt": {
-                "algorithm": settings.JWT_ALGORITHM,
-                "access_token_expire_minutes": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
-            },
-        }
-
+# ─────────────────────────────────────────────
+# 直接启动
+# ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # 本地运行
+    import uvicorn
+
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=settings.is_development,
-        log_level=settings.LOG_LEVEL.lower(),
+        port=port,
+        reload=settings.APP_DEBUG,
     )

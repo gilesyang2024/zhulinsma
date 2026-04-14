@@ -25,8 +25,12 @@ from src.core.exceptions import (
     business_error,
 )
 from src.core.cache import cache
+from src.core.config import Settings
 
 logger = logging.getLogger(__name__)
+
+# 初始化配置
+settings = Settings()
 
 router = APIRouter()
 
@@ -36,7 +40,7 @@ router = APIRouter()
 class UserRegisterRequest(BaseModel):
     """用户注册请求"""
     
-    username: str = Field(..., min_length=3, max_length=50, regex=r'^[a-zA-Z0-9_]+$')
+    username: str = Field(..., min_length=3, max_length=50, pattern=r'^[a-zA-Z0-9_]+$')
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
     full_name: Optional[str] = Field(None, max_length=100)

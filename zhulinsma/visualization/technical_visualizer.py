@@ -735,7 +735,7 @@ class TechnicalVisualizer:
                 
                 # 添加DEA线
                 if 'DEA' in MACD数据 and self._验证数据(MACD数据['DEA'], "DEA"):
-                    fig.add_trace(go.Scatch(
+                    fig.add_trace(go.Scatter(
                         x=日期序列,
                         y=MACD数据['DEA'],
                         mode='lines',
