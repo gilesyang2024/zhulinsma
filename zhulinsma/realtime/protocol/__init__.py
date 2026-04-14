@@ -1,231 +1,127 @@
+#!/usr/bin/env python3
 """
-实时数据协议定义
-定义WebSocket消息格式和协议
+竹林司马 (Zhulinsma) - 实时数据协议定义
+定义 WebSocket 消息格式、数据帧结构和事件类型
 """
-from dataclasses import dataclass, asdict
-from typing import List, Optional, Dict, Any
+
+from dataclasses import dataclass, asdict, field
+from typing import Any, Dict, List, Optional
 from enum import Enum
+import time
 import json
 
 
-class MessageType(Enum):
+class MessageType(str, Enum):
     """消息类型枚举"""
-    # 客户端 -> 服务端
-    SUBSCRIBE = "subscribe"
-    UNSUBSCRIBE = "unsubscribe"
-    HEARTBEAT = "heartbeat"
-    AUTH = "auth"
-    
-    # 服务端 -> 客户端
-    REALTIME = "realtime"
-    ALERT = "alert"
-    HEARTBEAT_ACK = "heartbeat_ack"
-    ERROR = "error"
-    CONNECTED = "connected"
+    # 行情数据
+    TICK = "tick"                   # 实时报价
+    BAR = "bar"                     # K线数据
+    DEPTH = "depth"                 # 盘口深度
+
+    # 控制消息
+    SUBSCRIBE = "subscribe"         # 订阅请求
+    UNSUBSCRIBE = "unsubscribe"     # 取消订阅
+    HEARTBEAT = "heartbeat"         # 心跳
+    ACK = "ack"                     # 确认回执
+    ERROR = "error"                 # 错误通知
+
+    # 预警消息
+    ALERT = "alert"                 # 技术指标预警
+    SIGNAL = "signal"               # 交易信号
 
 
-class ChannelType(Enum):
-    """订阅频道类型"""
-    STOCK = "stock"           # 股票行情
-    ALERT = "alert"           # 预警通知
-    ANALYSIS = "analysis"     # 实时分析
-
-
-class AlertType(Enum):
-    """预警类型"""
-    RSI_OVERBOUGHT = "rsi_overbought"      # RSI超买
+class AlertType(str, Enum):
+    """预警类型枚举"""
+    RSI_OVERBOUGHT = "rsi_overbought"       # RSI超买
     RSI_OVERSOLD = "rsi_oversold"           # RSI超卖
-    GOLDEN_CROSS = "golden_cross"           # 金叉
-    DEATH_CROSS = "death_cross"             # 死叉
-    VOLUME_SPIKE = "volume_spike"          # 成交量异动
-    PRICE_BREAK = "price_break"            # 突破支撑/阻力
-    DEVIATION_ALERT = "deviation_alert"     # 均线偏离预警
+    MACD_GOLDEN_CROSS = "macd_golden"       # MACD金叉
+    MACD_DEATH_CROSS = "macd_death"         # MACD死叉
+    MA_DEVIATION = "ma_deviation"           # 均线偏离
+    VOLUME_SURGE = "volume_surge"           # 成交量异动
+    PRICE_BREAKOUT = "price_breakout"       # 价格突破
 
 
 @dataclass
-class SubscribeRequest:
-    """订阅请求"""
-    type: str = "subscribe"
-    stock_codes: List[str] = None
-    channels: List[str] = None
-    alerts: Optional[Dict[str, float]] = None
-    
-    def __post_init__(self):
-        if self.stock_codes is None:
-            self.stock_codes = []
-        if self.channels is None:
-            self.channels = ["realtime"]
-            
-    def to_json(self) -> str:
-        return json.dumps(asdict(self))
-    
-    @classmethod
-    def from_json(cls, json_str: str) -> 'SubscribeRequest':
-        data = json.loads(json_str)
-        return cls(**data)
+class TickData:
+    """实时报价数据帧"""
+    ts_code: str                    # 股票代码
+    price: float                    # 最新价
+    volume: float                   # 成交量
+    amount: float                   # 成交额
+    bid: float = 0.0                # 买一价
+    ask: float = 0.0                # 卖一价
+    open: float = 0.0               # 今开
+    high: float = 0.0               # 最高
+    low: float = 0.0                # 最低
+    prev_close: float = 0.0         # 昨收
+    timestamp: float = field(default_factory=time.time)
+
+    @property
+    def pct_chg(self) -> float:
+        if self.prev_close > 0:
+            return (self.price - self.prev_close) / self.prev_close * 100
+        return 0.0
+
+    def to_dict(self) -> Dict:
+        d = asdict(self)
+        d["pct_chg"] = round(self.pct_chg, 4)
+        return d
 
 
 @dataclass
-class RealtimeData:
-    """实时行情数据"""
-    stock_code: str
-    price: float
-    change: float
-    change_pct: float
-    volume: int
+class BarData:
+    """K线数据帧"""
+    ts_code: str
+    freq: str                       # 1min / 5min / 15min / 30min / 60min / D
     open: float
     high: float
     low: float
-    amount: float
-    timestamp: str
-    # 技术指标
-    sma_5: Optional[float] = None
-    sma_10: Optional[float] = None
-    sma_20: Optional[float] = None
-    sma_30: Optional[float] = None
-    ema_12: Optional[float] = None
-    ema_26: Optional[float] = None
-    rsi: Optional[float] = None
-    macd: Optional[float] = None
-    macd_signal: Optional[float] = None
-    macd_hist: Optional[float] = None
-    boll_upper: Optional[float] = None
-    boll_mid: Optional[float] = None
-    boll_lower: Optional[float] = None
-    
-    def to_dict(self) -> dict:
-        return asdict(self)
-    
-    @classmethod
-    def from_dict(cls, data: dict) -> 'RealtimeData':
-        return cls(**data)
+    close: float
+    volume: float
+    amount: float = 0.0
+    timestamp: float = field(default_factory=time.time)
 
-
-@dataclass
-class RealtimeMessage:
-    """实时数据消息"""
-    type: str = "realtime"
-    stock_code: str = ""
-    data: RealtimeData = None
-    
-    def to_json(self) -> str:
-        return json.dumps({
-            "type": self.type,
-            "stock_code": self.stock_code,
-            "data": self.data.to_dict() if self.data else None
-        })
-    
-    @classmethod
-    def from_dict(cls, data: dict) -> 'RealtimeMessage':
-        return cls(
-            type=data.get("type"),
-            stock_code=data.get("stock_code"),
-            data=RealtimeData.from_dict(data["data"]) if data.get("data") else None
-        )
-
-
-@dataclass
-class AlertData:
-    """预警数据"""
-    alert_type: str
-    stock_code: str
-    message: str
-    value: float
-    threshold: float
-    timestamp: str
-    
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict:
         return asdict(self)
 
 
 @dataclass
 class AlertMessage:
     """预警消息"""
-    type: str = "alert"
-    alert_type: str = ""
-    stock_code: str = ""
-    message: str = ""
-    value: float = 0.0
-    threshold: float = 0.0
-    timestamp: str = ""
-    
-    def to_json(self) -> str:
-        return json.dumps(asdict(self))
-    
-    @classmethod
-    def from_dict(cls, data: dict) -> 'AlertMessage':
-        return cls(**data)
+    alert_type: str                 # AlertType 枚举值
+    ts_code: str
+    title: str
+    description: str
+    value: float                    # 触发值（如RSI=75）
+    threshold: float                # 阈值
+    severity: str = "INFO"          # INFO / WARN / ALERT / CRITICAL
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
 
 
 @dataclass
-class ErrorMessage:
-    """错误消息"""
-    type: str = "error"
-    code: int = 0
-    message: str = ""
-    
+class WsMessage:
+    """WebSocket 消息标准封装"""
+    type: str                       # MessageType 枚举值
+    data: Any
+    seq: int = 0                    # 序列号，用于消息去重
+    timestamp: float = field(default_factory=time.time)
+
     def to_json(self) -> str:
-        return json.dumps(asdict(self))
+        payload = {
+            "type": self.type,
+            "seq": self.seq,
+            "timestamp": self.timestamp,
+            "data": self.data if not hasattr(self.data, "to_dict") else self.data.to_dict(),
+        }
+        return json.dumps(payload, ensure_ascii=False)
 
+    @classmethod
+    def heartbeat(cls, seq: int = 0) -> "WsMessage":
+        return cls(type=MessageType.HEARTBEAT, data={"ping": time.time()}, seq=seq)
 
-class MessageParser:
-    """消息解析器"""
-    
-    @staticmethod
-    def parse(data: str) -> dict:
-        """解析JSON消息"""
-        try:
-            return json.loads(data)
-        except json.JSONDecodeError:
-            return {"type": "error", "message": "Invalid JSON"}
-    
-    @staticmethod
-    def create_realtime(stock_code: str, data: RealtimeData) -> str:
-        """创建实时数据消息"""
-        msg = RealtimeMessage(type="realtime", stock_code=stock_code, data=data)
-        return msg.to_json()
-    
-    @staticmethod
-    def create_alert(alert: AlertData) -> str:
-        """创建预警消息"""
-        msg = AlertMessage(
-            type="alert",
-            alert_type=alert.alert_type,
-            stock_code=alert.stock_code,
-            message=alert.message,
-            value=alert.value,
-            threshold=alert.threshold,
-            timestamp=alert.timestamp
-        )
-        return msg.to_json()
-    
-    @staticmethod
-    def create_error(code: int, message: str) -> str:
-        """创建错误消息"""
-        msg = ErrorMessage(type="error", code=code, message=message)
-        return msg.to_json()
-    
-    @staticmethod
-    def create_heartbeat() -> str:
-        """创建心跳响应"""
-        return json.dumps({"type": "heartbeat_ack", "status": "ok"})
-    
-    @staticmethod
-    def create_connected() -> str:
-        """创建连接成功消息"""
-        return json.dumps({"type": "connected", "status": "ok"})
-
-
-# 导出
-__all__ = [
-    'MessageType',
-    'ChannelType', 
-    'AlertType',
-    'SubscribeRequest',
-    'RealtimeData',
-    'RealtimeMessage',
-    'AlertData',
-    'AlertMessage',
-    'ErrorMessage',
-    'MessageParser'
-]
+    @classmethod
+    def error(cls, code: int, message: str) -> "WsMessage":
+        return cls(type=MessageType.ERROR, data={"code": code, "message": message})
