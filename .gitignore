@@ -56,3 +56,20 @@ Thumbs.db
 
 # Test outputs
 test_output/
+
+# SQLite database
+*.db
+*.sqlite
+*.sqlite3
+
+# WorkBuddy memory logs (personal session logs)
+.workbuddy/memory/
+
+# Temporary test/analysis scripts
+test_server.py
+
+# Local reports (generated at runtime)
+reports/
+
+# Expert history (session state)
+.workbuddy/expert-history.json

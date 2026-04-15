@@ -70,6 +70,15 @@ class Settings:
         self.RATE_LIMIT_AUTH = self._get_env("RATE_LIMIT_AUTH", "5/minute")
         self.RATE_LIMIT_UPLOAD = self._get_env("RATE_LIMIT_UPLOAD", "10/minute")
         
+        # LLM 大模型配置
+        self.LLM_PROVIDER = self._get_env("LLM_PROVIDER", "deepseek")  # deepseek/openai/qwen/glm/ollama
+        self.LLM_API_KEY = self._get_env("LLM_API_KEY", "")
+        self.LLM_MODEL = self._get_env("LLM_MODEL", "deepseek-chat")
+        self.LLM_TEMPERATURE = self._get_env_float("LLM_TEMPERATURE", 0.3)
+        self.LLM_MAX_TOKENS = self._get_env_int("LLM_MAX_TOKENS", 4096)
+        self.LLM_TIMEOUT = self._get_env_int("LLM_TIMEOUT", 60)
+        self.LLM_CACHE_ENABLED = self._get_env_bool("LLM_CACHE_ENABLED", True)
+        
         # 验证密钥长度
         if len(self.APP_SECRET_KEY) < 32:
             raise ValueError(f"APP_SECRET_KEY必须至少32个字符，当前{len(self.APP_SECRET_KEY)}个字符")
@@ -122,6 +131,16 @@ class Settings:
             return []
         
         return [item.strip() for item in value.split(",") if item.strip()]
+    
+    def _get_env_float(self, key: str, default: float) -> float:
+        """获取浮点数环境变量"""
+        value = os.getenv(key)
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except ValueError:
+            return default
     
     @property
     def is_production(self) -> bool:
