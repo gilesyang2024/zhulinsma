@@ -183,6 +183,26 @@ class ReportData:
         self.action_plan: List[str] = []
         self.analyst_notes: str = ""
 
+        # ====== 预测分析 (2026-04-16) ======
+        self.prediction_enabled: bool = False
+        # 趋势预测
+        self.trend_forecast: str = ""          # 短期趋势预判（如"震荡偏弱，关注25.8支撑"）
+        self.trend_confidence: str = ""        # 预判置信度（高/中/低）
+        self.forecast_horizon: str = ""        # 预测时间窗口（如"3-5个交易日"）
+        # 场景分析
+        self.scenario_bull: Dict[str, Any] = {}   # 乐观情景 {target, prob, trigger, desc}
+        self.scenario_base: Dict[str, Any] = {}   # 基准情景
+        self.scenario_bear: Dict[str, Any] = {}   # 悲观情景
+        # 关键价位预测
+        self.predicted_support: float = 0.0        # 预测支撑位
+        self.predicted_resistance: float = 0.0     # 预测阻力位
+        self.breakout_up_prob: float = 0.0         # 向上突破概率
+        self.breakout_down_prob: float = 0.0       # 向下跌破概率
+        # 时机判断
+        self.best_entry_window: str = ""           # 最佳入场窗口
+        self.key_catalyst: str = ""                # 关键催化因素
+        self.risk_event: str = ""                  # 风险事件预警
+
     def from_indicators_bundle(self, name: str, code: str, bundle) -> "ReportData":
         """从 IndicatorsBundle 填充技术面数据"""
         self.stock_name = name
@@ -525,6 +545,22 @@ class StockReportGenerator:
             "signal_reason": d.signal_reason or "",
             "plan_items": "".join(f"<li>{p}</li>" for p in d.action_plan),
             "analyst_notes": d.analyst_notes or "",
+
+            # 预测分析
+            "pred_enabled": d.prediction_enabled,
+            "trend_forecast": d.trend_forecast or "暂无预判",
+            "trend_confidence": d.trend_confidence or "—",
+            "forecast_horizon": d.forecast_horizon or "—",
+            "scenario_bull_html": _scenario_html(d.scenario_bull, "buy"),
+            "scenario_base_html": _scenario_html(d.scenario_base, "neutral"),
+            "scenario_bear_html": _scenario_html(d.scenario_bear, "sell"),
+            "pred_support": _price(d.predicted_support) if d.predicted_support else "—",
+            "pred_resistance": _price(d.predicted_resistance) if d.predicted_resistance else "—",
+            "breakout_up_prob": _pct(d.breakout_up_prob) if d.breakout_up_prob else "—",
+            "breakout_down_prob": _pct(d.breakout_down_prob) if d.breakout_down_prob else "—",
+            "best_entry_window": d.best_entry_window or "—",
+            "key_catalyst": d.key_catalyst or "—",
+            "risk_event": d.risk_event or "—",
         }
 
 
@@ -736,6 +772,21 @@ def _points_html(points: List[str], kind: str) -> str:
     if not points: return "<p class='text-sub'>暂无</p>"
     cls = "bull-point" if kind == "bull" else "bear-point"
     return "\n".join(f"<li class='{cls}'>{p}</li>" for p in points)
+
+
+def _scenario_html(sc: Dict, cls: str) -> str:
+    """生成单个情景分析 HTML 卡片"""
+    if not sc: return '<div class="text-sub">暂无数据</div>'
+    target = sc.get("target", "—")
+    prob = sc.get("prob", "—")
+    trigger = sc.get("trigger", "—")
+    desc_html = f'<div class="scenario-desc">{desc}</div>' if desc else ""
+    return (f'<div class="scenario-card scenario-{cls}">'
+            f'<div class="scenario-row"><span class="lbl">目标价位</span><span class="rgt {cls}">{target}</span></div>'
+            f'<div class="scenario-row"><span class="lbl">发生概率</span><span class="rgt">{prob}</span></div>'
+            f'<div class="scenario-row"><span class="lbl">触发条件</span><span class="rgt">{trigger}</span></div>'
+            f'{desc_html}'
+            f'</div>')
 
 
 # ─────────────────────────────────────────
