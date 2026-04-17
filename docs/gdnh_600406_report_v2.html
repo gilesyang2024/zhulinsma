@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>国电南瑞(600406) — 竹林司马AI选股分析报告</title>
+<style>
+{:root{--bg:#0d0f14;--card:#141820;--border:#1e2330;--text:#e0e4f0;
+  --sub:#8892a4;--buy:#00e5a0;--sell:#ff4d6d;--warn:#f5a623;--neutral:#6c8ef5;
+  --dim:#2a3040;--font:'PingFang SC','Microsoft YaHei',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font);
+      padding:20px 16px 60px;max-width:1200px;margin:0 auto;line-height:1.6}
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;
+      flex-wrap:wrap;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.ticker h1{font-size:26px;font-weight:800}
+.ticker .meta{color:var(--sub);font-size:12px;margin-top:4px}
+.price-block{text-align:right}
+.price{font-size:34px;font-weight:900;line-height:1}
+.chg{font-size:15px;margin-top:4px;font-weight:600}
+.pos{color:var(--buy)}.neg{color:var(--sell)}
+.score-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.card h3{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px}
+.val{font-size:24px;font-weight:800;margin-bottom:4px;line-height:1}
+.sub{font-size:12px;color:var(--sub)}
+.bar-wrap{height:5px;background:var(--dim);border-radius:3px;margin-top:8px;overflow:hidden}
+.bar{height:100%;border-radius:3px;transition:width .8s ease}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;margin:2px}
+.badge-buy{background:rgba(0,229,160,.15);color:var(--buy)}
+.badge-sell{background:rgba(255,77,109,.15);color:var(--sell)}
+.badge-warn{background:rgba(245,166,35,.15);color:var(--warn)}
+.badge-neutral{background:rgba(108,142,245,.12);color:var(--neutral)}
+.sep{margin:22px 0 14px;font-size:13px;color:var(--sub);font-weight:700;letter-spacing:.8px;border-bottom:1px solid var(--border);padding-bottom:6px}
+.sep span{color:var(--text)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.row{grid-template-columns:1fr}}
+.item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.item:last-child{border:none}
+.lbl{color:var(--sub);font-size:11px}
+.rgt{font-weight:600}
+.buy{color:var(--buy)}.sell{color:var(--sell)}.warn{color:var(--warn)}.neutral{color:var(--neutral)}
+.text-sub{font-size:12px;color:var(--sub)}
+.ma-table{width:100%;border-collapse:collapse}
+.ma-table td{padding:6px 8px;font-size:13px;border-bottom:1px solid var(--border)}
+.ma-table tr:last-child td{border:none}
+.masters-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.master-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.master-name{font-weight:700;font-size:13px;margin-bottom:6px}
+.master-score{font-size:22px;font-weight:900;margin-bottom:4px}
+.master-note{font-size:11px;color:var(--sub)}
+.bull-point,.bear-point{font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);line-height:1.6}
+.bull-point::before{content:'✓ ';color:var(--buy);font-weight:700}
+.bear-point::before{content:'⚠ ';color:var(--sell);font-weight:700}
+.risk-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.risk-dim{font-weight:600;min-width:90px}
+.risk-desc{color:var(--sub)}
+.strategy-item{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.strat-name{font-weight:700;font-size:13px}
+.strat-score{font-size:20px;font-weight:800}
+.strat-reason{grid-column:1/-1;font-size:12px;color:var(--sub)}
+.plan{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:16px}
+.plan h3{font-size:14px;margin-bottom:12px}
+.plan li{font-size:13px;margin-bottom:6px}
+.conclusion{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:20px;font-size:14px;line-height:2}
+.gap{height:12px}
+footer{text-align:center;color:var(--sub);font-size:11px;margin-top:40px;padding-top:16px;border-top:1px solid var(--border)}
+footer span{color:var(--text)}
+
+/* ══════ 结论先行面板 ══════ */
+.verdict-panel{background:linear-gradient(135deg,#141820 0%,#1a2030 100%);
+    border:2px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px;
+    display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:700px){.verdict-panel{grid-template-columns:1fr}}
+.verdict-main{display:flex;flex-direction:column;justify-content:center}
+.verdict-label{font-size:12px;color:var(--sub);letter-spacing:1px;margin-bottom:8px}
+.verdict-action{font-size:32px;font-weight:900;line-height:1.2;margin-bottom:12px}
+.verdict-score-line{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}
+.verdict-big-score{font-size:48px;font-weight:900;line-height:1}
+.verdict-grade{font-size:20px;font-weight:700;padding:4px 14px;border-radius:8px}
+.verdict-reason{font-size:13px;color:var(--sub);line-height:1.8;margin-top:8px}
+.verdict-details{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:400px){.verdict-details{grid-template-columns:1fr}}
+.vd-item{background:rgba(255,255,255,.03);border-radius:10px;padding:12px 14px}
+.vd-item .vd-label{font-size:11px;color:var(--sub);margin-bottom:4px}
+.vd-item .vd-value{font-size:18px;font-weight:800}
+.vd-item .vd-sub{font-size:11px;color:var(--sub);margin-top:2px}
+
+/* ══════ 预测分析面板 ══════ */
+.pred-panel{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+@media(max-width:700px){.pred-panel{grid-template-columns:1fr}}
+.scenario-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.scenario-card h4{font-size:12px;margin-bottom:10px;font-weight:700}
+.scenario-card h4.bull{color:var(--buy)}
+.scenario-card h4.base{color:var(--neutral)}
+.scenario-card h4.bear{color:var(--sell)}
+.scenario-buy{border-color:rgba(0,229,160,.3)}
+.scenario-neutral{border-color:rgba(108,142,245,.3)}
+.scenario-sell{border-color:rgba(255,77,109,.3)}
+.scenario-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+.scenario-row:last-child{border:none}
+.scenario-desc{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6}
+.pred-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px}
+.pred-meta-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px}
+.pred-meta-item .pmi-icon{font-size:20px;flex-shrink:0}
+.pred-meta-item .pmi-label{color:var(--sub);font-size:11px}
+.pred-meta-item .pmi-value{font-weight:700;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="ticker">
+    <h1>国电南瑞 <span style="font-weight:400;color:var(--sub)">600406</span></h1>
+    <div class="meta">SH · 电力设备·电网自动化 · 2026-04-16 · 数据121日</div>
+  </div>
+  <div class="price-block">
+    <div class="price">¥26.72</div>
+    <div class="chg neg">
+      ▼ -0.52% | 今开¥27.00 / 昨收¥26.86
+    </div>
+  </div>
+</div>
+
+<!-- ══════ 一、首席投资官结论（结论先行）══════ -->
+<div class="verdict-panel">
+  <div class="verdict-main">
+    <div class="verdict-label">🎯 首席投资官结论</div>
+    <div class="verdict-score-line">
+      <span class="verdict-big-score" style="color:#f5a623">61</span>
+      <span class="verdict-grade badge-warn"><span class="badge-warn">C级</span>级 · <span class="badge-buy">BUY</span></span>
+    </div>
+    <div class="verdict-reason">
+      综合61分/B级，MACD多头，中性均线
+    </div>
+  </div>
+  <div class="verdict-details">
+    <div class="vd-item">
+      <div class="vd-label">📍 操作方向</div>
+      <div class="vd-value neg">0%~5%（轻仓观望）</div>
+      <div class="vd-sub">信号置信度 75.00%</div>
+    </div>
+    <div class="vd-item">
+      <div class="vd-label">🛡️ 止损位</div>
+      <div class="vd-value sell">¥25.18</div>
+      <div class="vd-sub">VaR(95%) ¥1.27</div>
+    </div>
+    <div class="vd-item">
+      <div class="vd-label">🎯 目标1 / 目标2</div>
+      <div class="vd-value buy">¥28.86 / ¥30.73</div>
+      <div class="vd-sub">建议持仓 观望</div>
+    </div>
+    <div class="vd-item">
+      <div class="vd-label">📊 多空共识</div>
+      <div class="vd-value">技术 59 / 基本面 61 / 情绪 100</div>
+      <div class="vd-sub"><span class="badge-warn">中风险</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ 二、三维度评分概览 ══════ -->
+<div class="score-grid">
+  <div class="card"><h3>技术面 40%</h3>
+    <div class="val" style="color:#f5a623">59</div>
+    <div class="sub"><span class="badge-warn">C级</span>级</div>
+    <div class="bar-wrap"><div class="bar" style="width:59%;background:#f5a623"></div></div>
+  </div>
+  <div class="card"><h3>基本面 35%</h3>
+    <div class="val" style="color:#f5a623">61</div>
+    <div class="sub"><span class="badge-warn">C级</span>级</div>
+    <div class="bar-wrap"><div class="bar" style="width:61%;background:#f5a623"></div></div>
+  </div>
+  <div class="card"><h3>情绪面 25%</h3>
+    <div class="val" style="color:#00e5a0">100</div>
+    <div class="sub"><span class="badge-buy">A级</span>级</div>
+    <div class="bar-wrap"><div class="bar" style="width:100%;background:#00e5a0"></div></div>
+  </div>
+  <div class="card"><h3>风险等级</h3>
+    <div class="val sell">37</div>
+    <div class="sub"><span class="badge-warn">中风险</span> · 仓位上限建议</div>
+    <div class="bar-wrap"><div class="bar" style="width:37%;background:var(--sell)"></div></div>
+  </div>
+</div>
+
+<!-- ══════ 三、🔮 预测分析（新增）══════ -->
+<div class="sep">🔮 <span>预测分析</span></div>
+<div class="pred-panel">
+  <div class="scenario-card scenario-buy">
+    <h4 class="bull">🟢 乐观情景</h4>
+    <div class="scenario-card scenario-buy"><div class="scenario-row"><span class="lbl">目标价位</span><span class="rgt buy">¥28.50 (+7.3%)</span></div><div class="scenario-row"><span class="lbl">发生概率</span><span class="rgt">25%</span></div><div class="scenario-row"><span class="lbl">触发条件</span><span class="rgt">主力资金回流 + 站稳MA20</span></div><div class="scenario-desc">若北向资金加仓且板块政策利好，有望挑战前高。量能需回到日均80万手以上。</div></div>
+  </div>
+  <div class="scenario-card scenario-neutral">
+    <h4 class="base">🔵 基准情景</h4>
+    <div class="scenario-card scenario-neutral"><div class="scenario-row"><span class="lbl">目标价位</span><span class="rgt neutral">¥26.30 (-0.9%)</span></div><div class="scenario-row"><span class="lbl">发生概率</span><span class="rgt">50%</span></div><div class="scenario-row"><span class="lbl">触发条件</span><span class="rgt">维持当前格局</span></div><div class="scenario-desc">继续围绕MA20震荡整理，等待方向选择。缩量横盘，等待催化剂。</div></div>
+  </div>
+  <div class="scenario-card scenario-sell">
+    <h4 class="bear">🔴 悲观情景</h4>
+    <div class="scenario-card scenario-sell"><div class="scenario-row"><span class="lbl">目标价位</span><span class="rgt sell">¥24.50 (-7.7%)</span></div><div class="scenario-row"><span class="lbl">发生概率</span><span class="rgt">25%</span></div><div class="scenario-row"><span class="lbl">触发条件</span><span class="rgt">跌破MA60支撑26.13</span></div><div class="scenario-desc">若大盘系统性回调或主力加速出逃，可能回踩布林下轨。止损位25.80需严守。</div></div>
+  </div>
+</div>
+<div class="pred-meta">
+  <div class="pred-meta-item">
+    <div class="pmi-icon">📈</div>
+    <div><div class="pmi-label">趋势预判</div><div class="pmi-value">短期震荡偏弱，关注MA20支撑25.80。主力资金持续流出抑制反弹空间，需等缩量企稳信号。</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">⏱️</div>
+    <div><div class="pmi-label">预测窗口</div><div class="pmi-value">3-5个交易日 · 置信度 中</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">🎯</div>
+    <div><div class="pmi-label">预测支撑 / 阻力</div><div class="pmi-value buy">¥25.80 / <span class="sell">¥27.80</span></div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">📊</div>
+    <div><div class="pmi-label">突破概率</div><div class="pmi-value buy">↑25.00%</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">⏬</div>
+    <div><div class="pmi-label">跌破概率</div><div class="pmi-value sell">↓30.00%</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">🔑</div>
+    <div><div class="pmi-label">关键催化 / 风险事件</div><div class="pmi-value buy">电网投资政策加码 / 一季报超预期 / 北向资金加仓</div><div class="text-sub sell">大盘系统性回调风险 / 主力资金持续流出</div></div>
+  </div>
+</div>
+
+<!-- ══════ 四、行情快照 ══════ -->
+<div class="sep">📊 <span>行情快照</span></div>
+<div class="row">
+  <div class="card"><h3>价格与交易</h3>
+    <div class="item"><span class="lbl">今开/昨收</span><span class="rgt">¥27.00/¥26.86</span></div>
+    <div class="item"><span class="lbl">最高/最低</span><span class="rgt">¥27.06/¥26.41</span></div>
+    <div class="item"><span class="lbl">振幅</span><span class="rgt neg">2.42%</span></div>
+    <div class="item"><span class="lbl">成交量</span><span class="rgt">29万股</span></div>
+    <div class="item"><span class="lbl">成交额</span><span class="rgt">771万</span></div>
+    <div class="item"><span class="lbl">换手率</span><span class="rgt">25.75%</span></div>
+    <div class="item"><span class="lbl">量比</span><span class="rgt">1.00×</span></div>
+  </div>
+  <div class="card"><h3>区间收益率</h3>
+    <div class="item"><span class="lbl">5日涨跌</span><span class="rgt"><span class="badge-sell">0.00%</span></span></div>
+    <div class="item"><span class="lbl">10日涨跌</span><span class="rgt"><span class="badge-sell">0.00%</span></span></div>
+    <div class="item"><span class="lbl">30日涨跌</span><span class="rgt"><span class="badge-sell">0.00%</span></span></div>
+    <div class="item"><span class="lbl">60日涨跌</span><span class="rgt"><span class="badge-sell">0.00%</span></span></div>
+    <div class="item"><span class="lbl">60日区间</span><span class="rgt">¥0.00~¥0.00</span></div>
+    <div class="item"><span class="lbl">区间分位</span><span class="rgt">50.00%</span></div>
+    <div class="item"><span class="lbl">年初至今</span><span class="rgt"><span class="badge-sell">0.00%</span></span></div>
+  </div>
+</div>
+
+<!-- ══════ 五、技术面深度分析 ══════ -->
+<div class="sep">📈 <span>技术面深度分析</span></div>
+<div class="row">
+  <div class="card"><h3>均线系统</h3>
+    <table class="ma-table">
+      <tr><td class='lbl'>MA5</td><td>¥26.40</td><td class='buy'>+1.2%</td></tr>
+      <tr><td class='lbl'>MA10</td><td>¥26.22</td><td class='buy'>+1.9%</td></tr>
+      <tr><td class='lbl'>MA20</td><td>¥26.61</td><td class='buy'>+0.4%</td></tr>
+      <tr><td class='lbl'>MA60</td><td>¥26.79</td><td class='sell'>-0.3%</td></tr>
+    </table>
+    <div class="gap"></div>
+    <div><span class="badge-warn">震荡</span> 均线混合排列，震荡格局</div>
+  </div>
+  <div class="card"><h3>MACD 指标</h3>
+    <div class="item"><span class="lbl">MACD线</span><span class="rgt buy">-0.303</span></div>
+    <div class="item"><span class="lbl">Signal线</span><span class="rgt">-0.320</span></div>
+    <div class="item"><span class="lbl">Histogram</span><span class="rgt buy">0.017</span></div>
+    <div class="item"><span class="lbl">状态</span><span class="rgt"><span class="badge-buy">✓ 多头</span></span></div>
+    <div class="item"><span class="lbl">背离</span><span class="rgt"><span class="badge-neutral">无背离</span></span></div>
+    <div class="gap"></div>
+    <div class="text-sub">MACD零轴上方，多头，MACD金叉，短期看涨</div>
+  </div>
+</div>
+
+<div class="gap"></div>
+
+<div class="row">
+  <div class="card"><h3>KDJ 随机指标</h3>
+    <div class="item"><span class="lbl">K值</span><span class="rgt neutral">68.1</span></div>
+    <div class="item"><span class="lbl">D值</span><span class="rgt">65.7</span></div>
+    <div class="item"><span class="lbl">J值</span><span class="rgt neutral">72.8</span></div>
+    <div class="item"><span class="lbl">金叉</span><span class="rgt"><span class="badge-neutral">—</span></span></div>
+    <div class="item"><span class="lbl">状态</span><span class="rgt"><span class="badge-neutral">中性(K=68)</span></span></div>
+    <div class="gap"></div>
+    <div class="text-sub">KDJ中性区域(K=68)，无明显方向</div>
+  </div>
+  <div class="card"><h3>RSI + 布林带</h3>
+    <div class="item"><span class="lbl">RSI(14)</span><span class="rgt">53.0</span></div>
+    <div class="item"><span class="lbl">RSI状态</span><span class="rgt"><span class="badge-neutral">中性(53.0)</span></span></div>
+    <div class="item"><span class="lbl">ATR(14)</span><span class="rgt">¥0.77</span></div>
+    <div class="item"><span class="lbl">上轨(BOLL+2σ)</span><span class="rgt">¥27.83</span></div>
+    <div class="item"><span class="lbl">中轨(MA20)</span><span class="rgt">¥26.61</span></div>
+    <div class="item"><span class="lbl">下轨(BOLL-2σ)</span><span class="rgt">¥25.38</span></div>
+    <div class="item"><span class="lbl">布林位置</span><span class="rgt">54.62%</span></div>
+    <div class="item"><span class="lbl">收口</span><span class="rgt"><span class="badge-buy">✓ 收口蓄势</span></span></div>
+    <div class="gap"></div>
+    <div class="text-sub">布林收口，波动压缩，蓄势突破</div>
+  </div>
+</div>
+
+<!-- ══════ 六、趋势分析 ══════ -->
+<div class="sep">📉 <span>趋势分析</span></div>
+<div class="row">
+  <div class="card"><h3>多周期趋势</h3>
+    <div class="item"><span class="lbl">长期（120日）</span><span class="rgt"><span class="badge-warn">震荡</span></span></div>
+    <div class="item"><span class="lbl">中期（20日）</span><span class="rgt"><span class="badge-warn">震荡</span></span></div>
+    <div class="item"><span class="lbl">短期（5日）</span><span class="rgt"><span class="badge-warn">震荡</span></span></div>
+    <div class="item"><span class="lbl">短期动量</span><span class="rgt"><span class="badge-buy">加速</span></span></div>
+    <div class="item"><span class="lbl">趋势强度</span><span class="rgt">42分</span></div>
+    <div class="item"><span class="lbl">OBV</span><span class="rgt"><span class="badge-buy">上升</span></span></div>
+  </div>
+  <div class="card"><h3>支撑与阻力</h3>
+    <div class="item"><span class="lbl">阻力位</span><span class="rgt neg">¥26.79 / ¥27.83 / ¥30.73</span></div>
+    <div class="item"><span class="lbl">支撑位</span><span class="rgt buy">¥26.61 / ¥26.40 / ¥26.22</span></div>
+    <div class="item"><span class="lbl">60日区间位置</span><span class="rgt">50.00%</span></div>
+  </div>
+</div>
+
+<!-- ══════ 七、基本面评估 ══════ -->
+<div class="sep">🏛️ <span>基本面机构级评估</span></div>
+<div class="row">
+  <div class="card"><h3>估值指标</h3>
+    <div class="item"><span class="lbl">PE(TTM)</span><span class="rgt"><span style="color:#e0e4f0">28.5×</span></span></div>
+    <div class="item"><span class="lbl">行业PE均值</span><span class="rgt">27.0</span></div>
+    <div class="item"><span class="lbl">相对溢价</span><span class="rgt"><span class="badge-neutral">+6%vs行业</span></span></div>
+    <div class="item"><span class="lbl">PB(MRQ)</span><span class="rgt">3.80</span></div>
+    <div class="item"><span class="lbl">PS(TTM)</span><span class="rgt">3.10</span></div>
+    <div class="item"><span class="lbl">PEG</span><span class="rgt">—</span></div>
+    <div class="item"><span class="lbl">EPS</span><span class="rgt">—</span></div>
+  </div>
+  <div class="card"><h3>盈利能力与成长</h3>
+    <div class="item"><span class="lbl">净利润</span><span class="rgt">—</span></div>
+    <div class="item"><span class="lbl">净利润YoY</span><span class="rgt"><span class="badge-buy">+12.5%</span></span></div>
+    <div class="item"><span class="lbl">营收YoY</span><span class="rgt"><span class="badge-buy">+10.8%</span></span></div>
+    <div class="item"><span class="lbl">ROE</span><span class="rgt">14.20%</span></div>
+    <div class="item"><span class="lbl">负债率</span><span class="rgt">45.00%</span></div>
+    <div class="item"><span class="lbl">股息率</span><span class="rgt">1.80%</span></div>
+  </div>
+</div>
+
+<div class="sep">👥 <span>8位大师框架评分</span></div>
+<div class="masters-grid">
+  <div class="master-card"><div class="master-name">巴菲特</div><div class="master-score badge-sell">0</div><div class="master-note">ROE与护城河</div></div>
+<div class="master-card"><div class="master-name">芒格</div><div class="master-score badge-sell">0</div><div class="master-note">逆向思维</div></div>
+<div class="master-card"><div class="master-name">达里奥</div><div class="master-score badge-sell">0</div><div class="master-note">宏观分散</div></div>
+<div class="master-card"><div class="master-name">彼得·林奇</div><div class="master-score badge-sell">0</div><div class="master-note">PEG成长</div></div>
+<div class="master-card"><div class="master-name">格雷厄姆</div><div class="master-score badge-sell">0</div><div class="master-note">安全边际</div></div>
+<div class="master-card"><div class="master-name">格林布拉特</div><div class="master-score badge-sell">0</div><div class="master-note">ROIC</div></div>
+<div class="master-card"><div class="master-name">邓普顿</div><div class="master-score badge-sell">0</div><div class="master-note">极度悲观</div></div>
+<div class="master-card"><div class="master-name">索罗斯</div><div class="master-score badge-sell">0</div><div class="master-note">反身性</div></div>
+</div>
+
+<!-- ══════ 八、情绪与资金 ══════ -->
+<div class="sep">💰 <span>情绪与资金监测</span></div>
+<div class="row">
+  <div class="card"><h3>主力资金流向</h3>
+    <div class="item"><span class="lbl">5日净流入</span><span class="rgt"><span class="badge-buy">2</span></span></div>
+    <div class="item"><span class="lbl">10日净流入</span><span class="rgt">—</span></div>
+    <div class="item"><span class="lbl">30日净流入</span><span class="rgt">—</span></div>
+    <div class="item"><span class="lbl">高管动态</span><span class="rgt"><span class="badge-neutral">无异常</span> </span></div>
+    <div class="item"><span class="lbl">今日涨停</span><span class="rgt"><span class="badge-neutral">—</span></span></div>
+  </div>
+  <div class="card"><h3>情绪评分</h3>
+    <div class="val" style="font-size:36px;color:#00e5a0">100</div>
+    <div class="sub">满分100 · <span class="badge-buy">A级</span>级</div>
+    <div class="bar-wrap"><div class="bar" style="width:100%;background:#00e5a0"></div></div>
+  </div>
+</div>
+
+<!-- ══════ 九、战法评估 ══════ -->
+<div class="sep">⚔️ <span>四大战法评估</span></div>
+<div class="card"><p class="text-sub">战法数据暂无</p></div>
+
+<!-- ══════ 十、风险评估 ══════ -->
+<div class="sep">⚠️ <span>风险评估矩阵</span></div>
+<div class="row">
+  <div class="card"><h3>风险核心指标</h3>
+    <div class="item"><span class="lbl">综合风险评分</span><span class="rgt sell">37</span></div>
+    <div class="item"><span class="lbl">风险等级</span><span class="rgt"><span class="badge-warn">中风险</span></span></div>
+    <div class="item"><span class="lbl">止损价</span><span class="rgt neg">¥25.18</span></div>
+    <div class="item"><span class="lbl">VaR 95%</span><span class="rgt">¥1.27</span></div>
+    <div class="item"><span class="lbl">30日最大回撤</span><span class="rgt neg">3.63%</span></div>
+    <div class="item"><span class="lbl">风险收益比</span><span class="rgt">0.00</span></div>
+  </div>
+  <div class="card"><h3>各维度风险项</h3><div class="risk-item"><span class="badge-warn">中</span><span class="risk-dim">估值风险</span><span class="risk-desc">PE数据缺失</span></div>
+<div class="risk-item"><span class="badge-warn">中</span><span class="risk-dim">估值风险(PB)</span><span class="risk-desc">PB数据缺失</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">技术面风险(KDJ)</span><span class="risk-desc">KDJ中性（K=68.1 D=65.7），无明显超买超卖</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">技术面风险(MACD)</span><span class="risk-desc">MACD柱>0（=0.017），多头动能良好</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">技术面风险(均线)</span><span class="risk-desc">均线混合排列，震荡格局</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">技术面风险(布林带)</span><span class="risk-desc">布林带收口，波动率压缩，可能蓄势突破</span></div>
+<div class="risk-item"><span class="badge-warn">中</span><span class="risk-dim">流动性风险</span><span class="risk-desc">换手率25.75%偏高，博弈激烈</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">波动性风险</span><span class="risk-desc">ATR=0.77（2.9%），波动率正常</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">资金流向风险</span><span class="risk-desc">资金流向数据暂无</span></div>
+<div class="risk-item"><span class="badge-buy">低</span><span class="risk-dim">基本面风险</span><span class="risk-desc">基本面暂无明显风险</span></div></div>
+</div>
+
+<!-- ══════ 十一、多空逻辑 ══════ -->
+<div class="sep">⚖️ <span>多空逻辑对照</span></div>
+<div class="row">
+  <div class="card"><h3>🟢 做多逻辑</h3><ul><li class='bull-point'>MACD零轴上方（柱=0.017）</li>
+<li class='bull-point'>MACD金叉，短期看涨</li>
+<li class='bull-point'>布林收口蓄势待发</li></ul></div>
+  <div class="card"><h3>🔴 做空逻辑</h3><ul><p class='text-sub'>暂无</p></ul></div>
+</div>
+
+<!-- ══════ 十二、交易计划 ══════ -->
+<div class="sep">🎯 <span>交易计划与操作建议</span></div>
+<div class="row">
+  <div class="card"><h3>价格目标</h3>
+    <div class="item"><span class="lbl">建议入场</span><span class="rgt buy">¥26.72</span></div>
+    <div class="item"><span class="lbl">止损价</span><span class="rgt sell">¥25.18</span></div>
+    <div class="item"><span class="lbl">目标1(+8%)</span><span class="rgt buy">¥28.86</span></div>
+    <div class="item"><span class="lbl">目标2(+15%)</span><span class="rgt buy">¥30.73</span></div>
+    <div class="item"><span class="lbl">建议仓位</span><span class="rgt">0%~5%（轻仓观望）</span></div>
+    <div class="item"><span class="lbl">持仓周期</span><span class="rgt">观望</span></div>
+    <div class="item"><span class="lbl">信号置信度</span><span class="rgt">75.00%</span></div>
+  </div>
+  <div class="card"><h3>信号原因</h3>
+    <p class="text-sub">综合61分/B级，MACD多头，中性均线</p>
+  </div>
+</div>
+
+<div class="plan">
+  <h3>📋 操作步骤</h3>
+  <ul><li>建议操作：BUY</li><li>当前价：¥26.72</li><li>止损价：¥25.18（跌破即出）</li><li>目标1：¥28.86（+8.0%）</li><li>目标2：¥30.73（+15.0%）</li><li>等回踩MA10(¥26.22)或MA20(¥26.61)再介入</li><li>分批建仓：首批30%，确认后加仓至目标仓位</li></ul>
+</div>
+
+<div class="sep">📝 <span>分析师备注</span></div>
+<div class="conclusion">综合评分61分，C级。整体中性偏多，注意KDJ超买，建议分批介入。 本报告仅供参考，不构成投资建议。</div>
+
+<footer>
+  竹林司马 · AI选股分析引擎 · 数据来源：新浪财经/东方财富/AkShare<br>
+  本报告仅供参考，不构成投资建议。股市有风险，投资需谨慎。<br>
+  <span>国电南瑞 600406</span> · 分析日期：2026-04-16
+</footer>
+</body>
+</html>

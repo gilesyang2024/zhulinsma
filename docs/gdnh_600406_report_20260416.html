@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>竹林司马 AI 分析报告 — 国电南瑞 (600406)</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d2e; --border: #2a2d3e;
+    --text: #e4e6eb; --dim: #8b8fa3; --green: #00d4aa; --red: #ff4757;
+    --blue: #4facfe; --orange: #ffa502; --purple: #a855f7;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; padding:20px; max-width:900px; margin:0 auto; }
+  h1 { text-align:center; font-size:1.6em; margin-bottom:5px; }
+  .subtitle { text-align:center; color:var(--dim); font-size:0.85em; margin-bottom:24px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .card h2 { font-size:1.1em; color:var(--blue); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .card h2 span { font-size:0.7em; background:var(--border); color:var(--dim); padding:2px 8px; border-radius:10px; }
+  .price { font-size:2.4em; font-weight:700; }
+  .change { font-size:1.2em; margin-left:12px; }
+  .up { color:var(--green); } .down { color:var(--red); } .neutral { color:var(--orange); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:12px; }
+  .stat { background:rgba(255,255,255,0.03); border-radius:8px; padding:10px 14px; }
+  .stat .label { color:var(--dim); font-size:0.75em; } .stat .value { font-size:1.05em; font-weight:600; margin-top:2px; }
+  .row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+  .row:last-child { border-bottom:none; }
+  .bar-container { display:flex; align-items:center; gap:10px; margin:4px 0; }
+  .bar-label { width:80px; font-size:0.8em; color:var(--dim); text-align:right; }
+  .bar-track { flex:1; height:16px; background:rgba(255,255,255,0.06); border-radius:8px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:8px; transition:width 0.5s; }
+  .bar-score { width:40px; font-size:0.8em; font-weight:600; text-align:right; }
+  .signal-tag { display:inline-block; padding:3px 10px; border-radius:6px; font-size:0.8em; font-weight:600; }
+  .signal-buy { background:rgba(0,212,170,0.15); color:var(--green); }
+  .signal-wait { background:rgba(255,165,2,0.15); color:var(--orange); }
+  .signal-sell { background:rgba(255,71,87,0.15); color:var(--red); }
+  .strategy-card { background:rgba(255,255,255,0.02); border-radius:8px; padding:12px; margin-bottom:8px; }
+  .strategy-card h3 { font-size:0.9em; margin-bottom:6px; }
+  .conditions { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .cond { font-size:0.72em; padding:2px 8px; border-radius:4px; }
+  .cond-met { background:rgba(0,212,170,0.12); color:var(--green); }
+  .cond-fail { background:rgba(255,71,87,0.12); color:var(--red); }
+  .cond-excl { background:rgba(255,165,2,0.12); color:var(--orange); }
+  .pattern-list { display:flex; flex-direction:column; gap:4px; }
+  .pattern-item { display:flex; align-items:center; gap:8px; font-size:0.85em; padding:4px 0; }
+  .pattern-dot { width:8px; height:8px; border-radius:50%; }
+  .dot-bull { background:var(--green); } .dot-bear { background:var(--red); } .dot-neutral { background:var(--orange); }
+  .risk-level { font-size:1.5em; font-weight:700; }
+  .flow-table { width:100%; border-collapse:collapse; }
+  .flow-table th, .flow-table td { padding:8px 10px; text-align:right; font-size:0.85em; }
+  .flow-table th { color:var(--dim); font-weight:400; border-bottom:1px solid var(--border); }
+  .flow-table td { font-weight:500; }
+  .verdict { background:linear-gradient(135deg, rgba(255,71,87,0.1), rgba(79,172,254,0.1)); border:1px solid var(--red); border-radius:12px; padding:20px; text-align:center; }
+  .verdict .main { font-size:1.3em; font-weight:700; margin:10px 0; }
+  .verdict .sub { color:var(--dim); font-size:0.85em; }
+  .disclaimer { text-align:center; color:var(--dim); font-size:0.7em; margin-top:20px; padding:10px; }
+  @media(max-width:600px) { .grid2,.grid3 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<h1>📊 竹林司马 AI 分析报告</h1>
+<div class="subtitle">国电南瑞 (600406.SH) · 2026-04-16 09:47 · 综合电力设备商</div>
+
+<!-- 一、行情概览 -->
+<div class="card">
+  <h2>一、行情概览 <span>实时数据</span></h2>
+  <div style="display:flex;align-items:baseline;gap:10px;">
+    <div class="price">26.55</div>
+    <div class="change down">▼ -1.15%</div>
+    <div style="color:var(--dim);font-size:0.85em;margin-left:auto;">今日成交额 4.95亿</div>
+  </div>
+  <div class="grid2">
+    <div class="stat"><div class="label">开盘</div><div class="value">27.00</div></div>
+    <div class="stat"><div class="label">最高</div><div class="value">27.06</div></div>
+    <div class="stat"><div class="label">最低</div><div class="value">26.41</div></div>
+    <div class="stat"><div class="label">换手率</div><div class="value">0.23%</div></div>
+  </div>
+</div>
+
+<!-- 二、技术指标 -->
+<div class="card">
+  <h2>二、技术指标 <span>均线缠绕</span></h2>
+  <div class="grid3">
+    <div class="stat"><div class="label">MA5 / MA10 / MA20</div><div class="value">26.37 / 26.20 / 26.60</div></div>
+    <div class="stat"><div class="label">MA60</div><div class="value">26.79</div></div>
+    <div class="stat"><div class="label">RSI6 / RSI14</div><div class="value">49.46 / 46.56</div></div>
+    <div class="stat"><div class="label">MACD DIF/DEA</div><div class="value">-0.3168 / —</div></div>
+    <div class="stat"><div class="label">KDJ K/D/J</div><div class="value">59.14 / 64.18 / 49.06</div></div>
+    <div class="stat"><div class="label">BOLL 上/中/下轨</div><div class="value">27.79 / 26.60 / 25.40</div></div>
+  </div>
+  <div style="margin-top:12px;font-size:0.82em;color:var(--dim);">
+    价格位于 MA5上方0.7% · MA10上方1.3% · MA20<strong style="color:var(--red)">下方0.2%</strong> · 5日均量67.4万 · 量比0.28（缩量）
+  </div>
+</div>
+
+<!-- 三、选股战法 -->
+<div class="card">
+  <h2>三、选股战法扫描 <span>4大策略</span></h2>
+  
+  <div class="strategy-card">
+    <h3>🔒 锁仓K线策略 <span class="signal-tag signal-wait">1.2/5.0 观望</span></h3>
+    <div style="font-size:0.8em;color:var(--dim);">量能CV=41.01%（<15%），振幅=3.75%（<4%），量能对比10日前=77%（<70%），MA20=26.60（空头）</div>
+    <div class="conditions">
+      <span class="cond cond-met">✅价格振幅<4%</span>
+      <span class="cond cond-met">✅RSI健康</span>
+      <span class="cond cond-fail">❌量能CV</span>
+      <span class="cond cond-fail">❌量能vs10日</span>
+      <span class="cond cond-fail">❌收盘>MA20</span>
+      <span class="cond cond-fail">❌试盘锁仓</span>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <h3>⚡ 竞价弱转强策略 <span class="signal-tag signal-wait">2.5/5.0 观望</span></h3>
+    <div style="font-size:0.8em;color:var(--dim);">竞价高开0.52%，前日收阴，RSI=46.6（多方区间）</div>
+    <div class="conditions">
+      <span class="cond cond-met">✅高开<7%</span>
+      <span class="cond cond-met">✅前日弱势</span>
+      <span class="cond cond-met">✅前日收阴</span>
+      <span class="cond cond-met">✅站稳MA5</span>
+      <span class="cond cond-fail">❌竞价高开>1.5%</span>
+      <span class="cond cond-fail">❌竞价量放大</span>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <h3>🗡️ 利刃出鞘策略 <span class="signal-tag signal-wait">1.2/5.0 观望</span></h3>
+    <div style="font-size:0.8em;color:var(--dim);">条件不足</div>
+    <div class="conditions">
+      <span class="cond cond-excl">⚠️无倍量阴线</span>
+      <span class="cond cond-excl">⚠️无长上影线</span>
+      <span class="cond cond-fail">❌接近20日新高</span>
+      <span class="cond cond-fail">❌MACD多头</span>
+    </div>
+  </div>
+
+  <div class="strategy-card">
+    <h3>🔴 涨停板战法 <span class="signal-tag signal-wait">2.4/5.0 观望</span></h3>
+    <div style="font-size:0.8em;color:var(--dim);">ma5支撑✅，8天已收复✅</div>
+    <div class="conditions">
+      <span class="cond cond-excl">⚠️近30日无涨停</span>
+      <span class="cond cond-met">✅均线支撑</span>
+      <span class="cond cond-met">✅RSI健康</span>
+      <span class="cond cond-met">✅8天收复</span>
+      <span class="cond cond-met">✅收盘>MA5</span>
+    </div>
+  </div>
+</div>
+
+<!-- 四、AI综合评分 -->
+<div class="card">
+  <h2>四、AI综合评分 <span>10维度 · 42.2分 · 谨慎</span></h2>
+  <div class="bar-container">
+    <div class="bar-label">趋势强度</div>
+    <div class="bar-track"><div class="bar-fill" style="width:37%;background:var(--red);"></div></div>
+    <div class="bar-score down">37.0</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">动量指标</div>
+    <div class="bar-track"><div class="bar-fill" style="width:62%;background:var(--orange);"></div></div>
+    <div class="bar-score neutral">62.2</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">波动风险</div>
+    <div class="bar-track"><div class="bar-fill" style="width:80%;background:var(--green);"></div></div>
+    <div class="bar-score up">80.0</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">量价关系</div>
+    <div class="bar-track"><div class="bar-fill" style="width:60%;background:var(--orange);"></div></div>
+    <div class="bar-score neutral">60.3</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">策略信号</div>
+    <div class="bar-track"><div class="bar-fill" style="width:0%;background:var(--red);"></div></div>
+    <div class="bar-score down">0.0</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">真实资金面</div>
+    <div class="bar-track"><div class="bar-fill" style="width:5%;background:var(--red);"></div></div>
+    <div class="bar-score down">5.0</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">北向资金</div>
+    <div class="bar-track"><div class="bar-fill" style="width:50%;background:var(--orange);"></div></div>
+    <div class="bar-score neutral">50.0</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">消息面情绪</div>
+    <div class="bar-track"><div class="bar-fill" style="width:50%;background:var(--orange);"></div></div>
+    <div class="bar-score neutral">50.0</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">板块热度</div>
+    <div class="bar-track"><div class="bar-fill" style="width:64%;background:var(--orange);"></div></div>
+    <div class="bar-score neutral">63.9</div>
+  </div>
+  <div class="bar-container">
+    <div class="bar-label">大盘适配</div>
+    <div class="bar-track"><div class="bar-fill" style="width:52%;background:var(--orange);"></div></div>
+    <div class="bar-score neutral">51.8</div>
+  </div>
+  <div style="margin-top:10px;font-size:0.78em;color:var(--dim);">实际数据维度: 真实资金面、板块热度、大盘适配 | 北向/消息面使用中性默认值</div>
+</div>
+
+<!-- 五、K线形态 -->
+<div class="card">
+  <h2>五、K线形态识别 <span>中性 · 3多3空</span></h2>
+  <div class="pattern-list">
+    <div class="pattern-item"><div class="pattern-dot dot-bear"></div><span>看跌吞没</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">强</span></div>
+    <div class="pattern-item"><div class="pattern-dot dot-bear"></div><span>大阴线</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">强</span></div>
+    <div class="pattern-item"><div class="pattern-dot dot-bull"></div><span>大阳线</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">强</span></div>
+    <div class="pattern-item"><div class="pattern-dot dot-bull"></div><span>看涨吞没</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">强</span></div>
+    <div class="pattern-item"><div class="pattern-dot dot-bear"></div><span>大阴线</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">强</span></div>
+    <div class="pattern-item"><div class="pattern-dot dot-bull"></div><span>锤子线</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">强</span></div>
+    <div class="pattern-item"><div class="pattern-dot dot-neutral"></div><span>十字星</span><span style="color:var(--dim);font-size:0.8em;margin-left:auto;">中</span></div>
+  </div>
+</div>
+
+<!-- 六、资金面 -->
+<div class="card">
+  <h2>六、资金面分析 <span>今日主力净流出</span></h2>
+  <table class="flow-table">
+    <tr><th></th><th>净额(亿)</th><th>占比</th></tr>
+    <tr><td style="text-align:left;">🔴 主力资金</td><td class="down">-1.90</td><td class="down">-11.08%</td></tr>
+    <tr><td style="text-align:left;">&nbsp;&nbsp;超大单</td><td class="down">-1.47</td><td class="down">-8.61%</td></tr>
+    <tr><td style="text-align:left;">&nbsp;&nbsp;大单</td><td class="down">-0.42</td><td class="down">-2.47%</td></tr>
+    <tr><td style="text-align:left;">🟢 中单</td><td class="up">+0.72</td><td>—</td></tr>
+    <tr><td style="text-align:left;">🟢 小单</td><td class="up">+1.17</td><td>—</td></tr>
+  </table>
+  <div style="margin-top:10px;font-size:0.82em;color:var(--red);">⚠️ 主力资金大幅流出，中散户接盘，警惕短期回调风险</div>
+</div>
+
+<!-- 七、风险评估 -->
+<div class="card">
+  <h2>七、风险评估 <span class="signal-tag signal-sell">高风险</span></h2>
+  <div class="grid3">
+    <div class="stat"><div class="label">止损位</div><div class="value down">26.13 (-1.58%)</div></div>
+    <div class="stat"><div class="label">止盈(保守/基准)</div><div class="value up">26.74 / 27.63</div></div>
+    <div class="stat"><div class="label">止盈(乐观)</div><div class="value up">31.79 (+19.7%)</div></div>
+  </div>
+  <div class="grid2" style="margin-top:10px;">
+    <div class="stat"><div class="label">年化波动率</div><div class="value down">28.8%</div></div>
+    <div class="stat"><div class="label">最大回撤</div><div class="value down">8.2%</div></div>
+    <div class="stat"><div class="label">仓位上限</div><div class="value down">10%</div></div>
+    <div class="stat"><div class="label">ATR(14)</div><div class="value">0.63</div></div>
+  </div>
+</div>
+
+<!-- 八、板块与大盘 -->
+<div class="card">
+  <h2>八、板块与大盘环境</h2>
+  <div class="grid2">
+    <div class="stat"><div class="label">所属板块</div><div class="value">综合电力设备商</div></div>
+    <div class="stat"><div class="label">板块涨跌</div><div class="value up">+1.39%</div></div>
+    <div class="stat"><div class="label">沪深300</div><div class="value neutral">+0.36%</div></div>
+    <div class="stat"><div class="label">上证指数</div><div class="value neutral">+0.20%</div></div>
+  </div>
+  <div style="margin-top:10px;font-size:0.82em;color:var(--dim);">板块领涨: 东方电气 | 大盘情绪: 震荡</div>
+</div>
+
+<!-- 九、综合建议 -->
+<div class="verdict">
+  <div style="font-size:0.85em;color:var(--dim);">AI综合投资建议</div>
+  <div class="main down">⚠️ 注意风险 · 建议观望</div>
+  <div class="sub">
+    综合评分 42.2/100（谨慎） · 4大战法均未触发<br>
+    主力资金大幅流出1.9亿 · 均线缠绕无方向 · 今日缩量下跌1.15%<br>
+    建议等主力资金回流 + 均线多头排列 + 战法信号触发后再考虑介入
+  </div>
+</div>
+
+<div class="disclaimer">
+  ⚠️ 本分析基于历史数据和技术指标，由竹林司马 AI Engine v2.0 自动生成，仅供参考，不构成投资建议。投资有风险，入市需谨慎。
+</div>
+
+</body>
+</html>

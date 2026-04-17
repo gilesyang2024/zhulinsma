@@ -1,0 +1,33 @@
+{
+  "trained_at": "2026-04-15T22:01:09.699869",
+  "stock_codes": [
+    "600519",
+    "000001",
+    "600036",
+    "601318"
+  ],
+  "date_range": {
+    "start": "20200101",
+    "end": "20260415"
+  },
+  "total_samples": 560,
+  "features_count": 82,
+  "direction_model": {
+    "horizon_1d": {
+      "auc": 0.6314,
+      "accuracy": 0.6339
+    },
+    "horizon_5d": {
+      "auc": 0.4481,
+      "accuracy": 0.5
+    },
+    "horizon_20d": {
+      "auc": 0.224,
+      "accuracy": 0.2321
+    }
+  },
+  "risk_model": {
+    "max_drawdown_20d": 1.7327,
+    "var_95_20d": 0.6109
+  }
+}

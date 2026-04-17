@@ -159,6 +159,14 @@ class MultiPerspectiveAgent:
         strategy_signals: Optional[List[Dict]] = None,
         risk_data: Optional[Dict] = None,
         market_context: Optional[Dict] = None,
+        # ====== 新增七大维度 (2026-04-16) ======
+        money_flow: Optional[Dict] = None,       # 资金流向
+        north_flow: Optional[Dict] = None,       # 北向资金
+        dragon_tiger: Optional[Dict] = None,     # 龙虎榜
+        announcements: Optional[Dict] = None,    # 公告
+        financials: Optional[Dict] = None,       # 财务数据
+        sector_info: Optional[Dict] = None,      # 板块信息
+        market_env: Optional[Dict] = None,       # 大盘环境
     ) -> str:
         """构建股票分析上下文（所有角色共享的基础数据）"""
 
@@ -167,36 +175,93 @@ class MultiPerspectiveAgent:
             f"- 当前价: {current_price}元",
         ]
 
-        # 技术数据
+        # ── 技术面数据 ──────────────────────────────
         if technical_data:
-            lines.append("\n### 技术面数据")
+            lines.append("\n### 📈 技术面数据")
             for key, val in technical_data.items():
                 lines.append(f"- {key}: {val}")
 
-        # 基本面数据
-        if fundamental_data:
-            lines.append("\n### 基本面数据")
-            for key, val in fundamental_data.items():
-                lines.append(f"- {key}: {val}")
+        # ── 基本面数据 ──────────────────────────────
+        # 优先使用详细 financials，其次 fundamental_data
+        fin = financials or fundamental_data
+        if fin:
+            lines.append("\n### 📊 基本面 / 财务数据")
+            for key, val in fin.items():
+                if key != "错误":
+                    lines.append(f"- {key}: {val}")
 
-        # 战法信号
+        # ── 资金流向 ────────────────────────────────
+        if money_flow and "错误" not in money_flow:
+            lines.append("\n### 💰 资金流向（实时）")
+            lines.append(f"- 主力净流入: {money_flow.get('主力净流入', 0)/1e4:.0f}万元 "
+                         f"({money_flow.get('主力净流入占比', 0):.1f}%)")
+            lines.append(f"- 超大单净流入: {money_flow.get('超大单净流入', 0)/1e4:.0f}万元")
+            lines.append(f"- 大单净流入: {money_flow.get('大单净流入', 0)/1e4:.0f}万元")
+            lines.append(f"- 资金面判断: {money_flow.get('资金流向判断', 'N/A')}")
+
+        # ── 北向资金 ────────────────────────────────
+        if north_flow and "错误" not in north_flow:
+            lines.append("\n### 🌐 北向资金（沪深港通）")
+            lines.append(f"- 今日北向净买入: {north_flow.get('今日北向净买入(亿)', 0):.2f}亿元")
+            lines.append(f"- 近5日累计: {north_flow.get('近5日累计(亿)', 0):.2f}亿元")
+            lines.append(f"- 外资动向: {north_flow.get('市场情绪', 'N/A')}")
+
+        # ── 龙虎榜 ──────────────────────────────────
+        if dragon_tiger and dragon_tiger.get("上榜次数", 0) > 0:
+            lines.append("\n### 🐉 龙虎榜记录（近20日）")
+            lines.append(f"- 上榜次数: {dragon_tiger.get('上榜次数', 0)}")
+            lines.append(f"- 机构买入次数: {dragon_tiger.get('机构买入次数', 0)}")
+            lines.append(f"- 净买入合计: {dragon_tiger.get('净买入合计(万)', 0):.0f}万元")
+            lines.append(f"- 综合判断: {dragon_tiger.get('上榜判断', 'N/A')}")
+            for rec in (dragon_tiger.get("上榜记录") or [])[:3]:
+                lines.append(f"  · {rec.get('日期','')} {rec.get('上榜原因','')} "
+                             f"净额{rec.get('净额(万)',0):.0f}万")
+
+        # ── 公告信息 ────────────────────────────────
+        if announcements and announcements.get("公告数量", 0) > 0:
+            lines.append("\n### 📢 近期公告（近30日）")
+            lines.append(f"- 公告数量: {announcements.get('公告数量', 0)}")
+            lines.append(f"- 利好公告: {announcements.get('利好公告数', 0)}条")
+            lines.append(f"- 利空公告: {announcements.get('利空公告数', 0)}条")
+            lines.append(f"- 消息面情绪: {announcements.get('情绪倾向', '中性')}")
+            for ann in (announcements.get("重大公告") or [])[:3]:
+                lines.append(f"  · [{ann.get('日期','')}] {ann.get('标题','')} [{ann.get('类型','')}]")
+
+        # ── 板块信息 ────────────────────────────────
+        if sector_info and "错误" not in sector_info:
+            lines.append("\n### 🏭 板块信息")
+            lines.append(f"- 所属行业: {sector_info.get('所属行业', 'N/A')}")
+            lines.append(f"- 行业今日涨跌: {sector_info.get('行业涨跌(%)', 0):.2f}%")
+            lines.append(f"- 行业排名: {sector_info.get('行业排名', 'N/A')}")
+            lines.append(f"- 板块热度: {sector_info.get('板块热度', 'N/A')}")
+
+        # ── 大盘环境 ────────────────────────────────
+        if market_env and "错误" not in market_env:
+            lines.append("\n### 🌏 大盘环境")
+            lines.append(f"- 上证指数: {market_env.get('上证涨跌(%)', 0):+.2f}%")
+            lines.append(f"- 深证成指: {market_env.get('深证涨跌(%)', 0):+.2f}%")
+            lines.append(f"- 创业板: {market_env.get('创业板涨跌(%)', 0):+.2f}%")
+            lines.append(f"- 沪深300: {market_env.get('沪深300涨跌(%)', 0):+.2f}%")
+            lines.append(f"- 大盘情绪: {market_env.get('大盘情绪', 'N/A')}")
+
+        # ── 战法信号 ────────────────────────────────
         if strategy_signals:
-            lines.append("\n### 战法信号")
+            lines.append("\n### ⚡ 战法信号（规则引擎）")
             for sig in strategy_signals:
                 status = "✅ 已触发" if sig.get("触发") else "⭕ 未触发"
                 lines.append(f"- {sig.get('名称', '未知')}: {status}")
                 if sig.get("说明"):
                     lines.append(f"  说明: {sig['说明']}")
 
-        # 风险数据
+        # ── 风险评估 ────────────────────────────────
         if risk_data:
-            lines.append("\n### 风险评估数据")
+            lines.append("\n### 🛡️ 风险评估数据")
             for key, val in risk_data.items():
                 lines.append(f"- {key}: {val}")
 
-        # 市场环境
+        # ── 市场环境（兼容旧参数）────────────────────
         if market_context:
-            lines.append("\n### 市场环境")
+            lines.append("\n### 市场环境（补充）")
             for key, val in market_context.items():
                 lines.append(f"- {key}: {val}")
 
@@ -270,13 +335,15 @@ class MultiPerspectiveAgent:
         self,
         stock_name: str,
         stock_code: str,
+        current_price: float,
         individual_views: List[Dict],
         stock_context: str,
     ) -> str:
         """
-        汇总辩论，生成最终综合结论
+        汇总辩论，生成最终综合结论 + 预测分析
 
-        将四个角色的独立观点汇总，让LLM扮演"首席投资官"进行综合评判。
+        将四个角色的独立观点汇总，让LLM扮演"首席投资官"进行综合评判，
+        并输出结构化的预测分析（三情景、趋势预判、关键催化）。
         """
         views_text = ""
         for v in individual_views:
@@ -285,22 +352,60 @@ class MultiPerspectiveAgent:
 
         prompt = f"""你是竹林司马投研团队的"首席投资官"，现在团队四位分析师已经完成了独立分析。
 
-## 股票: {stock_name}（{stock_code}）
+## 股票: {stock_name}（{stock_code}）· 当前价 {current_price}元
 
 ## 四位分析师的观点
 {views_text}
 
 ## 你的任务
-请作为首席投资官，综合四位分析师的观点，做出最终投资决策。
+请作为首席投资官，综合四位分析师的观点，做出最终投资决策和预测分析。
 
-要求:
+### 第一部分：投资决策
 1. **承认分歧**: 如果分析师意见不一致，明确指出分歧点
 2. **加权判断**: 技术面和风险权重更高（各30%），基本面25%，情绪15%
 3. **最终结论**: 给出明确的投资建议（买入/观望/回避）+ 仓位建议 + 止损位
 4. **风险红线**: 列出2-3条不可违反的风险红线
 5. **一句话总结**: 用一句话概括核心观点
 
-输出格式:
+### 第二部分：预测分析（重要！必须严格按JSON格式输出）
+请基于当前技术面、基本面、情绪面数据，给出未来3-5个交易日的预测分析。
+
+请用以下格式输出预测部分（必须严格遵守JSON格式，不要有多余文字）：
+
+```PREDICTION_JSON
+{{
+  "trend_forecast": "一句话趋势预判",
+  "trend_confidence": "高/中/低",
+  "forecast_horizon": "3-5个交易日",
+  "scenario_bull": {{
+    "target": "¥目标价",
+    "prob": "30%",
+    "trigger": "触发条件",
+    "desc": "情景描述"
+  }},
+  "scenario_base": {{
+    "target": "¥目标价",
+    "prob": "50%",
+    "trigger": "维持现状条件",
+    "desc": "情景描述"
+  }},
+  "scenario_bear": {{
+    "target": "¥目标价",
+    "prob": "20%",
+    "trigger": "触发条件",
+    "desc": "情景描述"
+  }},
+  "predicted_support": 25.00,
+  "predicted_resistance": 28.00,
+  "breakout_up_prob": "25%",
+  "breakout_down_prob": "35%",
+  "best_entry_window": "建议入场时机描述",
+  "key_catalyst": "可能推动上涨的催化因素",
+  "risk_event": "需要警惕的风险事件"
+}}
+```
+
+输出格式（决策部分）:
 **🎯 首席投资官最终结论**
 （一句话核心观点）
 
@@ -319,7 +424,7 @@ class MultiPerspectiveAgent:
 
         return self.client.chat(
             message=prompt,
-            system_prompt="你是竹林司马的首席投资官，拥有30年A股投资经验。你擅长综合多方观点，做出理性、果断的投资决策。你永远把风险管理放在第一位。",
+            system_prompt="你是竹林司马的首席投资官，拥有30年A股投资经验。你擅长综合多方观点，做出理性、果断的投资决策。你永远把风险管理放在第一位。你的预测分析必须基于客观数据，避免过度乐观或悲观。",
             temperature=0.2,  # 综合判断用低温度，更确定
         )
 
@@ -333,6 +438,16 @@ class MultiPerspectiveAgent:
         strategy_signals: Optional[List[Dict]] = None,
         risk_data: Optional[Dict] = None,
         market_context: Optional[Dict] = None,
+        # ====== 新增七大维度 (2026-04-16) ======
+        money_flow: Optional[Dict] = None,
+        north_flow: Optional[Dict] = None,
+        dragon_tiger: Optional[Dict] = None,
+        announcements: Optional[Dict] = None,
+        financials: Optional[Dict] = None,
+        sector_info: Optional[Dict] = None,
+        market_env: Optional[Dict] = None,
+        # ====== 快捷模式：传入 full_data_dict 自动拆包 ======
+        full_data: Optional[Dict] = None,
     ) -> Dict[str, Any]:
         """
         执行完整的多角色辩论分析
@@ -341,11 +456,19 @@ class MultiPerspectiveAgent:
             stock_name: 股票名称
             stock_code: 股票代码
             current_price: 当前价格
-            technical_data: 技术面数据（均线/MACD/RSI/KDJ/量能等）
-            fundamental_data: 基本面数据（PE/PB/ROE/市值等）
+            technical_data: 技术面数据
+            fundamental_data: 基本面数据（传统接口，可被 financials 覆盖）
             strategy_signals: 战法信号列表
             risk_data: 风险评估数据
-            market_context: 市场环境数据
+            market_context: 市场环境数据（兼容旧版）
+            money_flow: 资金流向（StockDataService.获取资金流向）
+            north_flow: 北向资金（StockDataService.获取北向资金）
+            dragon_tiger: 龙虎榜（StockDataService.获取龙虎榜）
+            announcements: 公告（StockDataService.获取公告）
+            financials: 财务数据（StockDataService.获取财务数据）
+            sector_info: 板块信息（StockDataService.获取板块信息）
+            market_env: 大盘环境（StockDataService.获取大盘环境）
+            full_data: 传入 StockDataService.获取全维度数据() 的返回值，自动拆包
 
         返回:
             {
@@ -353,10 +476,20 @@ class MultiPerspectiveAgent:
                 "individual_views": {角色名: 分析结果, ...},
                 "synthesis": "首席投资官综合结论",
                 "debate_report": "完整辩论报告（Markdown）",
-                "signal_summary": {"risk": [...], "opportunity": [...], "optimize": [...]},
-                "consensus": {"action": "...", "position": "...", "stop_loss": "..."},
+                "signal_summary": {...},
+                "consensus": {...},
             }
         """
+        # 自动拆包 full_data
+        if full_data:
+            money_flow = money_flow or full_data.get("资金流向")
+            north_flow = north_flow or full_data.get("北向资金")
+            dragon_tiger = dragon_tiger or full_data.get("龙虎榜")
+            announcements = announcements or full_data.get("公告")
+            financials = financials or full_data.get("财务数据")
+            sector_info = sector_info or full_data.get("板块信息")
+            market_env = market_env or full_data.get("大盘环境")
+
         start_time = time.time()
 
         # 1. 构建共享上下文
@@ -369,6 +502,13 @@ class MultiPerspectiveAgent:
             strategy_signals=strategy_signals,
             risk_data=risk_data,
             market_context=market_context,
+            money_flow=money_flow,
+            north_flow=north_flow,
+            dragon_tiger=dragon_tiger,
+            announcements=announcements,
+            financials=financials,
+            sector_info=sector_info,
+            market_env=market_env,
         )
 
         # 2. 各角色独立分析
@@ -396,6 +536,7 @@ class MultiPerspectiveAgent:
             synthesis = self._synthesis(
                 stock_name=stock_name,
                 stock_code=stock_code,
+                current_price=current_price,
                 individual_views=views_list,
                 stock_context=stock_context,
             )
@@ -407,7 +548,10 @@ class MultiPerspectiveAgent:
 
         total_time = round(time.time() - start_time, 1)
 
-        # 4. 生成完整报告
+        # 4. 解析预测分析
+        prediction = self._parse_prediction(synthesis, current_price)
+
+        # 5. 生成完整报告
         debate_report = self._format_debate_report(
             stock_name=stock_name,
             stock_code=stock_code,
@@ -438,6 +582,7 @@ class MultiPerspectiveAgent:
             "debate_report": debate_report,
             "signal_summary": signal_summary,
             "consensus": consensus,
+            "prediction": prediction,
         }
 
     def _format_debate_report(
@@ -554,4 +699,94 @@ class MultiPerspectiveAgent:
             "action": consensus_action,
             "strength": f"{consensus_strength:.0%}",
             "action_distribution": action_count,
+        }
+
+    def _parse_prediction(self, synthesis: str, current_price: float) -> Dict[str, Any]:
+        """
+        从综合评判文本中解析预测分析JSON块
+
+        返回:
+            {
+                "trend_forecast": str,
+                "trend_confidence": str,
+                "forecast_horizon": str,
+                "scenario_bull": dict,
+                "scenario_base": dict,
+                "scenario_bear": dict,
+                "predicted_support": float,
+                "predicted_resistance": float,
+                "breakout_up_prob": str,
+                "breakout_down_prob": str,
+                "best_entry_window": str,
+                "key_catalyst": str,
+                "risk_event": str,
+            }
+        """
+        import re
+
+        # 尝试提取 PREDICTION_JSON 块
+        pattern = r'```PREDICTION_JSON\s*\n(.*?)\n```'
+        match = re.search(pattern, synthesis, re.DOTALL)
+
+        if not match:
+            # 兜底：尝试提取任何 JSON 块
+            pattern2 = r'```\s*\n(\{.*?\})\n```'
+            match = re.search(pattern2, synthesis, re.DOTALL)
+
+        if match:
+            try:
+                pred = json.loads(match.group(1).strip())
+                # 修正数值类型
+                pred.setdefault("trend_forecast", "")
+                pred.setdefault("trend_confidence", "中")
+                pred.setdefault("forecast_horizon", "3-5个交易日")
+                pred.setdefault("scenario_bull", {})
+                pred.setdefault("scenario_base", {})
+                pred.setdefault("scenario_bear", {})
+                pred.setdefault("predicted_support", 0.0)
+                pred.setdefault("predicted_resistance", 0.0)
+                pred.setdefault("breakout_up_prob", "")
+                pred.setdefault("breakout_down_prob", "")
+                pred.setdefault("best_entry_window", "")
+                pred.setdefault("key_catalyst", "")
+                pred.setdefault("risk_event", "")
+                return pred
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"   ⚠️ 预测JSON解析失败: {e}")
+
+        # JSON 解析失败时，基于规则引擎生成基础预测
+        return self._rule_based_prediction(current_price)
+
+    def _rule_based_prediction(self, current_price: float) -> Dict[str, Any]:
+        """规则引擎兜底：基于当前价格生成基础预测"""
+        # 简单基于价格波动范围计算情景
+        return {
+            "trend_forecast": "数据不足，需更多分析",
+            "trend_confidence": "低",
+            "forecast_horizon": "3-5个交易日",
+            "scenario_bull": {
+                "target": f"¥{current_price * 1.08:.2f}",
+                "prob": "30%",
+                "trigger": "放量突破阻力位",
+                "desc": "若主力资金回流且均线多头排列",
+            },
+            "scenario_base": {
+                "target": f"¥{current_price:.2f}",
+                "prob": "50%",
+                "trigger": "维持当前震荡格局",
+                "desc": "继续区间震荡，等待方向选择",
+            },
+            "scenario_bear": {
+                "target": f"¥{current_price * 0.92:.2f}",
+                "prob": "20%",
+                "trigger": "跌破关键支撑位",
+                "desc": "若主力持续流出或大盘跳水",
+            },
+            "predicted_support": round(current_price * 0.96, 2),
+            "predicted_resistance": round(current_price * 1.05, 2),
+            "breakout_up_prob": "25%",
+            "breakout_down_prob": "35%",
+            "best_entry_window": "等待回调至支撑位附近",
+            "key_catalyst": "待确认",
+            "risk_event": "大盘系统性风险",
         }

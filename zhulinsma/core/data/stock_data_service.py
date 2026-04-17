@@ -332,6 +332,461 @@ class StockDataService:
             "时间": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
 
+    # ============================================================
+    # 新增：七大维度数据获取（2026-04-16 增强）
+    # 覆盖：资金流向 / 北向资金 / 龙虎榜 / 公告 / 财务 / 板块 / 大盘
+    # ============================================================
+
+    def _清理代理(self) -> Dict:
+        """清除代理环境变量，返回旧值以便恢复"""
+        import os
+        keys = ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
+        return {k: os.environ.pop(k, None) for k in keys}
+
+    def _恢复代理(self, old_env: Dict) -> None:
+        import os
+        for k, v in old_env.items():
+            if v is not None:
+                os.environ[k] = v
+
+    def 获取资金流向(self, 股票代码: str) -> Dict[str, Any]:
+        """
+        获取个股资金流向数据（东方财富）
+
+        返回:
+            {
+                "主力净流入": float（元）,
+                "主力净流入占比": float（%）,
+                "超大单净流入": float,
+                "大单净流入": float,
+                "中单净流入": float,
+                "小单净流入": float,
+                "更新时间": str,
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用", "主力净流入": 0}
+
+        import akshare as ak
+        old_env = self._清理代理()
+        try:
+            symbol = 股票代码.split(".")[0]
+            df = ak.stock_individual_fund_flow(stock=symbol, market="sh" if symbol.startswith("6") else "sz")
+            if df is None or df.empty:
+                return {"错误": "无资金流向数据", "主力净流入": 0}
+
+            latest = df.iloc[-1]
+            result = {
+                "更新日期": str(latest.get("日期", "")),
+                "主力净流入": float(latest.get("主力净流入-净额", 0) or 0),
+                "主力净流入占比": float(latest.get("主力净流入-净占比", 0) or 0),
+                "超大单净流入": float(latest.get("超大单净流入-净额", 0) or 0),
+                "大单净流入": float(latest.get("大单净流入-净额", 0) or 0),
+                "中单净流入": float(latest.get("中单净流入-净额", 0) or 0),
+                "小单净流入": float(latest.get("小单净流入-净额", 0) or 0),
+            }
+            # 辅助判断
+            主力 = result["主力净流入"]
+            result["资金流向判断"] = (
+                "主力大幅净流入" if 主力 > 5e7 else
+                "主力净流入" if 主力 > 1e7 else
+                "主力小幅流入" if 主力 > 0 else
+                "主力小幅流出" if 主力 > -1e7 else
+                "主力大幅净流出"
+            )
+            return result
+        except Exception as e:
+            return {"错误": str(e), "主力净流入": 0}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取北向资金(self) -> Dict[str, Any]:
+        """
+        获取北向资金（沪深港通）今日及近期数据
+
+        返回:
+            {
+                "今日北向净买入": float（亿元）,
+                "沪股通净买入": float,
+                "深股通净买入": float,
+                "近5日累计": float,
+                "市场情绪": str,
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用", "今日北向净买入": 0}
+
+        import akshare as ak
+        old_env = self._清理代理()
+        try:
+            df = ak.stock_hsgt_north_net_flow_in_em(symbol="北向资金")
+            if df is None or df.empty:
+                return {"错误": "无北向资金数据", "今日北向净买入": 0}
+
+            df = df.tail(5)
+            today_val = float(df.iloc[-1].get("当日资金流入", 0) or 0)
+            recent_5 = float(df["当日资金流入"].sum() or 0)
+
+            return {
+                "今日北向净买入(亿)": round(today_val / 1e8, 2),
+                "近5日累计(亿)": round(recent_5 / 1e8, 2),
+                "市场情绪": (
+                    "外资大幅买入" if today_val > 50e8 else
+                    "外资净买入" if today_val > 0 else
+                    "外资净卖出" if today_val > -50e8 else
+                    "外资大幅撤离"
+                ),
+                "更新日期": str(df.iloc[-1].get("日期", "")),
+            }
+        except Exception as e:
+            return {"错误": str(e), "今日北向净买入(亿)": 0}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取龙虎榜(self, 股票代码: str, 最近天数: int = 20) -> Dict[str, Any]:
+        """
+        获取个股近期龙虎榜记录
+
+        返回:
+            {
+                "上榜次数": int,
+                "机构买入次数": int,
+                "净买入合计": float（元）,
+                "上榜记录": [...],
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用", "上榜次数": 0}
+
+        import akshare as ak
+        from datetime import datetime, timedelta
+        old_env = self._清理代理()
+        try:
+            end = datetime.now().strftime("%Y%m%d")
+            start = (datetime.now() - timedelta(days=最近天数)).strftime("%Y%m%d")
+            symbol = 股票代码.split(".")[0]
+
+            df = ak.stock_lhb_detail_em(symbol=symbol, start_date=start, end_date=end)
+            if df is None or df.empty:
+                return {"上榜次数": 0, "机构买入次数": 0, "净买入合计": 0, "上榜记录": []}
+
+            上榜次数 = len(df)
+            records = []
+            净买入合计 = 0.0
+            机构买入 = 0
+
+            for _, row in df.iterrows():
+                净额 = float(row.get("净额", 0) or 0)
+                净买入合计 += 净额
+                营业部 = str(row.get("营业部名称", ""))
+                if "机构" in 营业部 or "基金" in 营业部:
+                    机构买入 += 1
+                records.append({
+                    "日期": str(row.get("上榜日期", "")),
+                    "上榜原因": str(row.get("上榜原因", "")),
+                    "净额(万)": round(净额 / 1e4, 1),
+                })
+
+            return {
+                "上榜次数": 上榜次数,
+                "机构买入次数": 机构买入,
+                "净买入合计(万)": round(净买入合计 / 1e4, 1),
+                "上榜判断": "机构频繁介入" if 机构买入 >= 2 else ("有龙虎榜关注" if 上榜次数 > 0 else "近期未上龙虎榜"),
+                "上榜记录": records[:5],  # 最近5条
+            }
+        except Exception as e:
+            return {"错误": str(e), "上榜次数": 0}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取公告(self, 股票代码: str, 最近天数: int = 30) -> Dict[str, Any]:
+        """
+        获取个股近期公告摘要
+
+        返回:
+            {
+                "公告数量": int,
+                "重大公告": [...],  # 含回购/增持/业绩/中标等
+                "情绪倾向": "利好/利空/中性",
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用", "公告数量": 0}
+
+        import akshare as ak
+        old_env = self._清理代理()
+        try:
+            symbol = 股票代码.split(".")[0]
+            df = ak.stock_notice_report(symbol=symbol)
+            if df is None or df.empty:
+                return {"公告数量": 0, "重大公告": [], "情绪倾向": "中性"}
+
+            # 筛选最近天数
+            from datetime import datetime, timedelta
+            cutoff = (datetime.now() - timedelta(days=最近天数)).strftime("%Y-%m-%d")
+            if "公告日期" in df.columns:
+                df = df[df["公告日期"] >= cutoff]
+
+            公告数量 = len(df)
+            利好关键词 = ["回购", "增持", "中标", "获批", "分红", "业绩超预期", "合同", "收购"]
+            利空关键词 = ["诉讼", "处罚", "立案", "质押", "减持", "亏损", "调查"]
+
+            重大公告 = []
+            利好数 = 0
+            利空数 = 0
+
+            for _, row in df.iterrows():
+                标题 = str(row.get("公告标题", "") or row.get("标题", ""))
+                is_重大 = any(kw in 标题 for kw in 利好关键词 + 利空关键词)
+                if is_重大:
+                    重大公告.append({
+                        "日期": str(row.get("公告日期", "")),
+                        "标题": 标题[:50],
+                        "类型": "利好" if any(kw in 标题 for kw in 利好关键词) else "利空",
+                    })
+                    if any(kw in 标题 for kw in 利好关键词):
+                        利好数 += 1
+                    else:
+                        利空数 += 1
+
+            情绪 = "利好" if 利好数 > 利空数 else ("利空" if 利空数 > 利好数 else "中性")
+            return {
+                "公告数量": 公告数量,
+                "利好公告数": 利好数,
+                "利空公告数": 利空数,
+                "情绪倾向": 情绪,
+                "重大公告": 重大公告[:5],
+            }
+        except Exception as e:
+            return {"错误": str(e), "公告数量": 0, "情绪倾向": "中性"}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取财务数据(self, 股票代码: str) -> Dict[str, Any]:
+        """
+        获取个股关键财务指标（PE/PB/ROE/毛利率/营收增长等）
+
+        返回:
+            {
+                "PE": float,
+                "PB": float,
+                "ROE": float,
+                "毛利率": float,
+                "净利润增长率": float,
+                "总市值(亿)": float,
+                "估值判断": str,
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用"}
+
+        import akshare as ak
+        old_env = self._清理代理()
+        try:
+            symbol = 股票代码.split(".")[0]
+
+            # 尝试获取个股信息（含估值）
+            result = {}
+            try:
+                df_info = ak.stock_individual_info_em(symbol=symbol)
+                if df_info is not None and not df_info.empty:
+                    info_dict = dict(zip(df_info["item"], df_info["value"]))
+                    result["总市值(亿)"] = round(float(str(info_dict.get("总市值", 0)).replace(",", "") or 0) / 1e8, 2)
+                    result["流通市值(亿)"] = round(float(str(info_dict.get("流通市值", 0)).replace(",", "") or 0) / 1e8, 2)
+                    result["PE(动)"] = float(str(info_dict.get("市盈率(动态)", 0)).replace("--", "0") or 0)
+                    result["PB"] = float(str(info_dict.get("市净率", 0)).replace("--", "0") or 0)
+            except Exception:
+                pass
+
+            # 获取财务指标（ROE/毛利率等）
+            try:
+                df_fin = ak.stock_financial_analysis_indicator(symbol=symbol, start_year="2023")
+                if df_fin is not None and not df_fin.empty:
+                    latest = df_fin.iloc[-1]
+                    result["ROE(%)"] = float(latest.get("净资产收益率", 0) or 0)
+                    result["毛利率(%)"] = float(latest.get("销售毛利率", 0) or 0)
+                    result["净利润增长率(%)"] = float(latest.get("净利润增长率", 0) or 0)
+                    result["营收增长率(%)"] = float(latest.get("主营业务收入增长率", 0) or 0)
+            except Exception:
+                pass
+
+            # 估值判断
+            pe = result.get("PE(动)", 0)
+            pb = result.get("PB", 0)
+            roe = result.get("ROE(%)", 0)
+            if pe > 0 and roe > 0:
+                result["估值判断"] = (
+                    "低估" if pe < 20 and pb < 2 else
+                    "合理" if pe < 35 else
+                    "偏高" if pe < 60 else
+                    "高估"
+                )
+            else:
+                result["估值判断"] = "数据不足"
+
+            return result
+        except Exception as e:
+            return {"错误": str(e)}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取板块信息(self, 股票代码: str) -> Dict[str, Any]:
+        """
+        获取个股所属板块及板块涨跌情绪
+
+        返回:
+            {
+                "所属行业": str,
+                "行业涨跌(%)": float,
+                "行业排名": str,
+                "板块热度": str,
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用"}
+
+        import akshare as ak
+        old_env = self._清理代理()
+        try:
+            symbol = 股票代码.split(".")[0]
+
+            # 获取个股所属行业
+            所属行业 = "未知"
+            try:
+                df_info = ak.stock_individual_info_em(symbol=symbol)
+                if df_info is not None and not df_info.empty:
+                    info_dict = dict(zip(df_info["item"], df_info["value"]))
+                    所属行业 = str(info_dict.get("行业", "未知"))
+            except Exception:
+                pass
+
+            # 获取行业板块行情
+            行业涨跌 = 0.0
+            行业排名 = "未知"
+            try:
+                df_sector = ak.stock_sector_spot(need_number="100")
+                if df_sector is not None and not df_sector.empty and 所属行业 != "未知":
+                    match = df_sector[df_sector["板块名称"].str.contains(所属行业[:4], na=False)]
+                    if not match.empty:
+                        行业涨跌 = float(match.iloc[0].get("涨跌幅", 0) or 0)
+                        行业排名 = f"第{match.index[0]+1}名/共{len(df_sector)}个板块"
+            except Exception:
+                pass
+
+            return {
+                "所属行业": 所属行业,
+                "行业涨跌(%)": round(行业涨跌, 2),
+                "行业排名": 行业排名,
+                "板块热度": (
+                    "板块强势领涨" if 行业涨跌 > 2 else
+                    "板块上涨" if 行业涨跌 > 0.5 else
+                    "板块平稳" if 行业涨跌 > -0.5 else
+                    "板块下跌"
+                ),
+            }
+        except Exception as e:
+            return {"错误": str(e), "所属行业": "未知"}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取大盘环境(self) -> Dict[str, Any]:
+        """
+        获取沪深300/上证/创业板当日表现及大盘情绪
+
+        返回:
+            {
+                "上证涨跌(%)": float,
+                "深证涨跌(%)": float,
+                "创业板涨跌(%)": float,
+                "沪深300涨跌(%)": float,
+                "大盘情绪": str,
+                "市场状态": str,
+            }
+        """
+        if not self._数据源可用["akshare"]:
+            return {"错误": "akshare不可用", "大盘情绪": "未知"}
+
+        import akshare as ak
+        old_env = self._清理代理()
+        try:
+            result = {}
+            # 获取主要指数实时行情
+            try:
+                df = ak.stock_zh_index_spot_em()
+                if df is not None and not df.empty:
+                    def _get_chg(name_kw: str) -> float:
+                        row = df[df["名称"].str.contains(name_kw, na=False)]
+                        return float(row.iloc[0].get("涨跌幅", 0)) if not row.empty else 0.0
+
+                    result["上证涨跌(%)"] = round(_get_chg("上证指数"), 2)
+                    result["深证涨跌(%)"] = round(_get_chg("深证成指"), 2)
+                    result["创业板涨跌(%)"] = round(_get_chg("创业板指"), 2)
+                    result["沪深300涨跌(%)"] = round(_get_chg("沪深300"), 2)
+            except Exception:
+                pass
+
+            # 大盘综合情绪
+            avg = sum([
+                result.get("上证涨跌(%)", 0),
+                result.get("深证涨跌(%)", 0),
+                result.get("沪深300涨跌(%)", 0),
+            ]) / 3
+
+            result["大盘情绪"] = (
+                "市场大幅上涨，做多氛围浓厚" if avg > 2 else
+                "市场偏强，风险偏好提升" if avg > 0.5 else
+                "市场震荡，谨慎操作" if avg > -0.5 else
+                "市场偏弱，注意风险" if avg > -2 else
+                "市场大跌，防守为主"
+            )
+            result["市场状态"] = "强势" if avg > 1 else ("震荡" if avg > -1 else "弱势")
+
+            return result
+        except Exception as e:
+            return {"错误": str(e), "大盘情绪": "未知"}
+        finally:
+            self._恢复代理(old_env)
+
+    def 获取全维度数据(
+        self,
+        股票代码: str,
+        包含北向: bool = True,
+        包含龙虎榜: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        一键获取全维度数据（技术面+资金面+消息面+大盘）
+
+        这是 LLM 上下文注入的核心入口。
+
+        返回完整的多维度数据字典，可直接传入 debate.py 的 analyze() 方法。
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # 并发获取（减少总耗时）
+        tasks = {
+            "资金流向": lambda: self.获取资金流向(股票代码),
+            "财务数据": lambda: self.获取财务数据(股票代码),
+            "板块信息": lambda: self.获取板块信息(股票代码),
+            "公告": lambda: self.获取公告(股票代码),
+            "大盘环境": lambda: self.获取大盘环境(),
+        }
+        if 包含北向:
+            tasks["北向资金"] = lambda: self.获取北向资金()
+        if 包含龙虎榜:
+            tasks["龙虎榜"] = lambda: self.获取龙虎榜(股票代码)
+
+        results = {}
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
+            for future in as_completed(future_map):
+                name = future_map[future]
+                try:
+                    results[name] = future.result(timeout=15)
+                except Exception as e:
+                    results[name] = {"错误": str(e)}
+
+        return results
+
 
 # ========== 测试 ==========
 

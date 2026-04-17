@@ -129,10 +129,13 @@ class LLMClient:
         # API Key 优先级: kwargs > 环境变量(供应商特定) > 环境变量(通用)
         api_key = kwargs.get("api_key") or os.getenv(defaults["env_key"]) or os.getenv("LLM_API_KEY", "")
 
+        # base_url 优先级: kwargs > 环境变量(LLM_BASE_URL) > 供应商默认
+        base_url = kwargs.get("base_url") or os.getenv("LLM_BASE_URL", "") or defaults["base_url"]
+
         return LLMConfig(
             provider=provider,
             api_key=api_key,
-            base_url=kwargs.get("base_url", defaults["base_url"]),
+            base_url=base_url,
             model=kwargs.get("model", os.getenv("LLM_MODEL", defaults["default_model"])),
             temperature=float(kwargs.get("temperature", os.getenv("LLM_TEMPERATURE", "0.3"))),
             max_tokens=int(kwargs.get("max_tokens", os.getenv("LLM_MAX_TOKENS", "4096"))),
@@ -170,7 +173,9 @@ class LLMClient:
         import urllib.error
         import ssl
 
-        url = f"{self.config.base_url}/chat/completions"
+        # 智能 URL 拼接：base_url 可能是 API 前缀或完整端点
+        base = self.config.base_url.rstrip("/")
+        url = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
         payload = {
             "model": override_kwargs.get("model", self.config.model),
             "messages": messages,

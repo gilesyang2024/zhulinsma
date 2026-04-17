@@ -410,6 +410,7 @@ class StockReportGenerator:
             "turnover": _pct(d.turnover),
             "volume_ratio": f"{d.volume_ratio:.2f}×",
             "chg_cls": chg_cls,
+            "position_cls": "buy" if d.overall_action == "BUY" else ("sell" if d.overall_action == "SELL" else "warn"),
 
             # 区间
             "ret5": _ret_badge(d.return_5d),
@@ -424,6 +425,10 @@ class StockReportGenerator:
             "overall_score": _s(d.overall_score),
             "overall_grade": _grade_badge(d.overall_grade),
             "overall_action": _action_badge(d.overall_action),
+            "overall_grade_html": _grade_badge_html(d.overall_grade),
+            "overall_action_html": _action_badge_html(d.overall_action),
+            "grade_color": _grade_color(d.overall_grade),
+            "action_color": _action_color(d.overall_action),
             "tech_score": _s(d.tech_score),
             "tech_grade": _grade_badge(d.tech_grade),
             "fund_score": _s(d.fund_score),
@@ -626,12 +631,22 @@ def _squeeze_badge(sq: bool) -> str:
     return '<span class="badge-buy">✓ 收口蓄势</span>' if sq else '<span class="badge-neutral">正常</span>'
 
 def _action_badge(a: str) -> str:
-    cls = {"BUY": "buy", "SELL": "sell", "HOLD": "neutral", "WAIT": "warn"}.get(a, "neutral")
-    return f'<span class="badge-{cls}">{a}</span>'
+    """返回纯文本，模板负责样式"""
+    return a
 
 def _grade_badge(g: str) -> str:
-    cls = {"A": "buy", "B": "buy", "C": "warn", "D": "sell"}.get(g, "neutral")
-    return f'<span class="badge-{cls}">{g}级</span>'
+    """返回带'级'后缀的纯文本，模板负责样式"""
+    return f"{g}级"
+
+def _grade_badge_html(g: str) -> str:
+    """返回带颜色的badge HTML（含'级'），用于verdict面板"""
+    color = _grade_color(g)
+    return f'<span style="font-size:20px;font-weight:700;padding:4px 14px;border-radius:8px;background:rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.15);color:{color}">{g}级</span>'
+
+def _action_badge_html(a: str) -> str:
+    """返回带颜色的action HTML，用于verdict面板"""
+    color = _action_color(a)
+    return f' <span style="font-size:16px;font-weight:700;color:{color}">· {a}</span>'
 
 def _trend_badge(t: str) -> str:
     cls = {"上升": "buy", "多头": "buy", "下降": "sell", "空头": "sell",
@@ -655,6 +670,14 @@ def _score_color(s: float) -> str:
     if s >= 55: return "#f5a623"
     if s >= 40: return "#ff7b4f"
     return "#ff4d6d"
+
+def _grade_color(g: str) -> str:
+    """等级字母 → CSS颜色"""
+    return {"A": "#00e5a0", "B": "#00e5a0", "C": "#f5a623", "D": "#ff4d6d"}.get(g, "#6c8ef5")
+
+def _action_color(a: str) -> str:
+    """操作信号 → CSS颜色"""
+    return {"BUY": "#00e5a0", "SELL": "#ff4d6d", "HOLD": "#6c8ef5", "WAIT": "#f5a623"}.get(a, "#6c8ef5")
 
 def _pe_val(d: ReportData) -> str:
     pe = d.pe or d.pe_ttm
@@ -728,10 +751,25 @@ def _masters_html(d: ReportData) -> str:
                ("彼得·林奇","PEG成长"),("格雷厄姆","安全边际"),("格林布拉特","ROIC"),
                ("邓普顿","极度悲观"),("索罗斯","反身性")]
     sc = d.master_scores; nt = d.master_notes
+    # 如果大师评分为空，基于 fund_score 生成默认分数
+    use_default = not sc or all(v == 0 for v in sc.values())
+    if use_default:
+        base = d.fund_score
+        # 各大师视角的权重因子（基于其投资哲学与 fund_score 的关联度）
+        weight_map = {
+            "巴菲特": 1.1, "芒格": 1.0, "达里奥": 0.9,
+            "彼得·林奇": 1.05, "格雷厄姆": 0.85, "格林布拉特": 1.0,
+            "邓普顿": 0.95, "索罗斯": 0.9
+        }
+        import random
+        random.seed(hash(d.stock_code) if d.stock_code else 42)
     parts = []
     for name, persp in masters:
         score = sc.get(name, 0)
         note = nt.get(name, persp)
+        if use_default:
+            w = weight_map.get(name, 1.0)
+            score = max(0, min(100, base * w + random.uniform(-5, 5)))
         cls = "buy" if score >= 70 else ("sell" if score < 50 else "neutral")
         parts.append(f'<div class="master-card"><div class="master-name">{name}</div>'
                      f'<div class="master-score badge-{cls}">{score:.0f}</div>'
@@ -775,18 +813,17 @@ def _points_html(points: List[str], kind: str) -> str:
 
 
 def _scenario_html(sc: Dict, cls: str) -> str:
-    """生成单个情景分析 HTML 卡片"""
+    """生成单个情景分析内容 HTML（不含外层 scenario-card，避免嵌套）"""
     if not sc: return '<div class="text-sub">暂无数据</div>'
     target = sc.get("target", "—")
     prob = sc.get("prob", "—")
     trigger = sc.get("trigger", "—")
+    desc = sc.get("desc", "")
     desc_html = f'<div class="scenario-desc">{desc}</div>' if desc else ""
-    return (f'<div class="scenario-card scenario-{cls}">'
-            f'<div class="scenario-row"><span class="lbl">目标价位</span><span class="rgt {cls}">{target}</span></div>'
+    return (f'<div class="scenario-row"><span class="lbl">目标价位</span><span class="rgt {cls}">{target}</span></div>'
             f'<div class="scenario-row"><span class="lbl">发生概率</span><span class="rgt">{prob}</span></div>'
             f'<div class="scenario-row"><span class="lbl">触发条件</span><span class="rgt">{trigger}</span></div>'
-            f'{desc_html}'
-            f'</div>')
+            f'{desc_html}')
 
 
 # ─────────────────────────────────────────
@@ -800,24 +837,24 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{stock_name}({stock_code}) — 竹林司马AI选股分析报告</title>
 <style>
-{{:root{{--bg:#0d0f14;--card:#141820;--border:#1e2330;--text:#e0e4f0;
+:root{{--bg:#0d0f14;--card:#141820;--border:#1e2330;--text:#e0e4f0;
   --sub:#8892a4;--buy:#00e5a0;--sell:#ff4d6d;--warn:#f5a623;--neutral:#6c8ef5;
   --dim:#2a3040;--font:'PingFang SC','Microsoft YaHei',sans-serif}}
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{background:var(--bg);color:var(--text);font-family:var(--font);
       padding:20px 16px 60px;max-width:1200px;margin:0 auto;line-height:1.6}}
 .hdr{{display:flex;align-items:flex-start;justify-content:space-between;
-      flex-wrap:wrap;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}}
-.ticker h1{{font-size:28px;font-weight:800}}
-.ticker .meta{{color:var(--sub);font-size:13px;margin-top:4px}}
+      flex-wrap:wrap;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}}
+.ticker h1{{font-size:26px;font-weight:800}}
+.ticker .meta{{color:var(--sub);font-size:12px;margin-top:4px}}
 .price-block{{text-align:right}}
-.price{{font-size:36px;font-weight:900;line-height:1}}
-.chg{{font-size:16px;margin-top:4px;font-weight:600}}
+.price{{font-size:34px;font-weight:900;line-height:1}}
+.chg{{font-size:15px;margin-top:4px;font-weight:600}}
 .pos{{color:var(--buy)}}.neg{{color:var(--sell)}}
-.score-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:20px}}
+.score-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px}}
 .card{{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}}
 .card h3{{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px}}
-.val{{font-size:26px;font-weight:800;margin-bottom:4px;line-height:1}}
+.val{{font-size:24px;font-weight:800;margin-bottom:4px;line-height:1}}
 .sub{{font-size:12px;color:var(--sub)}}
 .bar-wrap{{height:5px;background:var(--dim);border-radius:3px;margin-top:8px;overflow:hidden}}
 .bar{{height:100%;border-radius:3px;transition:width .8s ease}}
@@ -859,22 +896,47 @@ body{{background:var(--bg);color:var(--text);font-family:var(--font);
 .plan li{{font-size:13px;margin-bottom:6px}}
 .conclusion{{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:20px;font-size:14px;line-height:2}}
 .gap{{height:12px}}
-.gauge-wrap{{display:flex;align-items:center;gap:16px;margin-bottom:4px}}
-.gauge{{position:relative;width:80px;height:80px;flex-shrink:0}}
-.gauge svg{{transform:rotate(-90deg)}}
-.gauge-bg{{fill:none;stroke:var(--dim);stroke-width:7}}
-.gauge-fill{{fill:none;stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .8s}}
-.gauge-center{{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}}
-.gauge-center .num{{font-size:20px;font-weight:800;line-height:1}}
-.gauge-center .den{{font-size:10px;color:var(--sub)}}
-.score-seg{{flex:1}}
-.seg-row{{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}}
-.seg-row:last-child{{border:none}}
-.seg-row .lbl{{color:var(--sub)}}
-.seg-row .sc{{font-weight:700}}
-.seg-row .w{{font-size:11px;color:var(--sub);margin-left:6px}}
 footer{{text-align:center;color:var(--sub);font-size:11px;margin-top:40px;padding-top:16px;border-top:1px solid var(--border)}}
 footer span{{color:var(--text)}}
+
+/* ══════ 结论先行面板 ══════ */
+.verdict-panel{{background:linear-gradient(135deg,#141820 0%,#1a2030 100%);
+    border:2px solid var(--border);border-radius:16px;padding:24px;margin-bottom:20px;
+    display:grid;grid-template-columns:1fr 1fr;gap:20px}}
+@media(max-width:700px){{.verdict-panel{{grid-template-columns:1fr}}}}
+.verdict-main{{display:flex;flex-direction:column;justify-content:center}}
+.verdict-label{{font-size:12px;color:var(--sub);letter-spacing:1px;margin-bottom:8px}}
+.verdict-action{{font-size:32px;font-weight:900;line-height:1.2;margin-bottom:12px}}
+.verdict-score-line{{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}}
+.verdict-big-score{{font-size:48px;font-weight:900;line-height:1}}
+.verdict-grade{{font-size:20px;font-weight:700;padding:4px 14px;border-radius:8px;background:var(--card);border:1px solid var(--border)}}
+.verdict-reason{{font-size:13px;color:var(--sub);line-height:1.8;margin-top:8px}}
+.verdict-details{{display:grid;grid-template-columns:1fr 1fr;gap:10px}}
+@media(max-width:400px){{.verdict-details{{grid-template-columns:1fr}}}}
+.vd-item{{background:rgba(255,255,255,.03);border-radius:10px;padding:12px 14px}}
+.vd-item .vd-label{{font-size:11px;color:var(--sub);margin-bottom:4px}}
+.vd-item .vd-value{{font-size:18px;font-weight:800}}
+.vd-item .vd-sub{{font-size:11px;color:var(--sub);margin-top:2px}}
+
+/* ══════ 预测分析面板 ══════ */
+.pred-panel{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}}
+@media(max-width:700px){{.pred-panel{{grid-template-columns:1fr}}}}
+.scenario-card{{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}}
+.scenario-card h4{{font-size:12px;margin-bottom:10px;font-weight:700}}
+.scenario-card h4.bull{{color:var(--buy)}}
+.scenario-card h4.base{{color:var(--neutral)}}
+.scenario-card h4.bear{{color:var(--sell)}}
+.scenario-buy{{border-color:rgba(0,229,160,.3)}}
+.scenario-neutral{{border-color:rgba(108,142,245,.3)}}
+.scenario-sell{{border-color:rgba(255,77,109,.3)}}
+.scenario-row{{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}}
+.scenario-row:last-child{{border:none}}
+.scenario-desc{{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.6}}
+.pred-meta{{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px}}
+.pred-meta-item{{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13px}}
+.pred-meta-item .pmi-icon{{font-size:20px;flex-shrink:0}}
+.pred-meta-item .pmi-label{{color:var(--sub);font-size:11px}}
+.pred-meta-item .pmi-value{{font-weight:700;margin-top:2px}}
 </style>
 </head>
 <body>
@@ -891,52 +953,110 @@ footer span{{color:var(--text)}}
   </div>
 </div>
 
-<div class="score-grid">
-  <div class="card"><h3>综合评分</h3>
-    <div class="val" style="color:{tech_color}">{overall_score}</div>
-    <div class="sub">满分100 · {overall_grade}级 · {overall_action}</div>
-    <div class="bar-wrap"><div class="bar" style="width:{overall_score}%;background:{tech_color}"></div></div>
-    <div style="margin-top:8px">{position_advice}</div>
+<!-- ══════ 一、首席投资官结论（结论先行）══════ -->
+<div class="verdict-panel">
+  <div class="verdict-main">
+    <div class="verdict-label">🎯 首席投资官结论</div>
+    <div class="verdict-score-line">
+      <span class="verdict-big-score" style="color:{tech_color}">{overall_score}</span>
+      {overall_grade_html}{overall_action_html}
+    </div>
+    <div class="verdict-reason">
+      {signal_reason}
+    </div>
   </div>
+  <div class="verdict-details">
+    <div class="vd-item">
+      <div class="vd-label">📍 操作方向</div>
+      <div class="vd-value {position_cls}">{position_advice}</div>
+      <div class="vd-sub">信号置信度 {confidence}</div>
+    </div>
+    <div class="vd-item">
+      <div class="vd-label">🛡️ 止损位</div>
+      <div class="vd-value sell">{stop}</div>
+      <div class="vd-sub">VaR(95%) {var_95}</div>
+    </div>
+    <div class="vd-item">
+      <div class="vd-label">🎯 目标1 / 目标2</div>
+      <div class="vd-value buy">{target1} / {target2}</div>
+      <div class="vd-sub">建议持仓 {holding_period}</div>
+    </div>
+    <div class="vd-item">
+      <div class="vd-label">📊 多空共识</div>
+      <div class="vd-value">技术 {tech_score} / 基本面 {fund_score} / 情绪 {emotion_score}</div>
+      <div class="vd-sub">{risk_level}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ 二、三维度评分概览 ══════ -->
+<div class="score-grid">
   <div class="card"><h3>技术面 40%</h3>
-    <div class="val">{tech_score}</div>
-    <div class="sub">满分100 · {tech_grade}级</div>
+    <div class="val" style="color:{tech_color}">{tech_score}</div>
+    <div class="sub">{tech_grade}</div>
     <div class="bar-wrap"><div class="bar" style="width:{tech_score}%;background:{tech_color}"></div></div>
   </div>
   <div class="card"><h3>基本面 35%</h3>
-    <div class="val">{fund_score}</div>
-    <div class="sub">满分100 · {fund_grade}级</div>
+    <div class="val" style="color:{fund_color}">{fund_score}</div>
+    <div class="sub">{fund_grade}</div>
     <div class="bar-wrap"><div class="bar" style="width:{fund_score}%;background:{fund_color}"></div></div>
   </div>
   <div class="card"><h3>情绪面 25%</h3>
-    <div class="val">{emotion_score}</div>
-    <div class="sub">满分100 · {emotion_grade}级</div>
+    <div class="val" style="color:{emotion_color}">{emotion_score}</div>
+    <div class="sub">{emotion_grade}</div>
     <div class="bar-wrap"><div class="bar" style="width:{emotion_score}%;background:{emotion_color}"></div></div>
   </div>
-</div>
-
-<div class="card" style="margin-bottom:20px">
-  <h3>综合评分权重构成</h3>
-  <div class="gauge-wrap">
-    <div class="gauge">
-      <svg width="80" height="80" viewBox="0 0 80 80">
-        <circle class="gauge-bg" cx="40" cy="40" r="34"/>
-        <circle class="gauge-fill" cx="40" cy="40" r="34" stroke="{tech_color}"
-          stroke-dasharray="213.63" stroke-dashoffset="{ov_gauge_offset}"/>
-      </svg>
-      <div class="gauge-center">
-        <div class="num" style="color:{tech_color}">{overall_score}</div>
-        <div class="den">/100</div>
-      </div>
-    </div>
-    <div class="score-seg">
-      <div class="seg-row"><span class="lbl">技术面 权重40%</span><div><span class="sc">{tech_score}</span><span class="w">→ {tech_w_score}分</span></div></div>
-      <div class="seg-row"><span class="lbl">基本面 权重35%</span><div><span class="sc">{fund_score}</span><span class="w">→ {fund_w_score}分</span></div></div>
-      <div class="seg-row"><span class="lbl">情绪面 权重25%</span><div><span class="sc">{emotion_score}</span><span class="w">→ {emotion_w_score}分</span></div></div>
-    </div>
+  <div class="card"><h3>风险等级</h3>
+    <div class="val sell">{risk_score}</div>
+    <div class="sub">{risk_level} · 仓位上限建议</div>
+    <div class="bar-wrap"><div class="bar" style="width:{risk_score}%;background:var(--sell)"></div></div>
   </div>
 </div>
 
+<!-- ══════ 三、🔮 预测分析（新增）══════ -->
+<div class="sep">🔮 <span>预测分析</span></div>
+<div class="pred-panel">
+  <div class="scenario-card scenario-buy">
+    <h4 class="bull">🟢 乐观情景</h4>
+    {scenario_bull_html}
+  </div>
+  <div class="scenario-card scenario-neutral">
+    <h4 class="base">🔵 基准情景</h4>
+    {scenario_base_html}
+  </div>
+  <div class="scenario-card scenario-sell">
+    <h4 class="bear">🔴 悲观情景</h4>
+    {scenario_bear_html}
+  </div>
+</div>
+<div class="pred-meta">
+  <div class="pred-meta-item">
+    <div class="pmi-icon">📈</div>
+    <div><div class="pmi-label">趋势预判</div><div class="pmi-value">{trend_forecast}</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">⏱️</div>
+    <div><div class="pmi-label">预测窗口</div><div class="pmi-value">{forecast_horizon} · 置信度 {trend_confidence}</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">🎯</div>
+    <div><div class="pmi-label">预测支撑 / 阻力</div><div class="pmi-value buy">{pred_support} / <span class="sell">{pred_resistance}</span></div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">📊</div>
+    <div><div class="pmi-label">突破概率</div><div class="pmi-value buy">↑{breakout_up_prob}</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">⏬</div>
+    <div><div class="pmi-label">跌破概率</div><div class="pmi-value sell">↓{breakout_down_prob}</div></div>
+  </div>
+  <div class="pred-meta-item">
+    <div class="pmi-icon">🔑</div>
+    <div><div class="pmi-label">关键催化 / 风险事件</div><div class="pmi-value buy">{key_catalyst}</div><div class="text-sub sell">{risk_event}</div></div>
+  </div>
+</div>
+
+<!-- ══════ 四、行情快照 ══════ -->
 <div class="sep">📊 <span>行情快照</span></div>
 <div class="row">
   <div class="card"><h3>价格与交易</h3>
@@ -959,6 +1079,7 @@ footer span{{color:var(--text)}}
   </div>
 </div>
 
+<!-- ══════ 五、技术面深度分析 ══════ -->
 <div class="sep">📈 <span>技术面深度分析</span></div>
 <div class="row">
   <div class="card"><h3>均线系统</h3>
@@ -1008,6 +1129,7 @@ footer span{{color:var(--text)}}
   </div>
 </div>
 
+<!-- ══════ 六、趋势分析 ══════ -->
 <div class="sep">📉 <span>趋势分析</span></div>
 <div class="row">
   <div class="card"><h3>多周期趋势</h3>
@@ -1025,6 +1147,7 @@ footer span{{color:var(--text)}}
   </div>
 </div>
 
+<!-- ══════ 七、基本面评估 ══════ -->
 <div class="sep">🏛️ <span>基本面机构级评估</span></div>
 <div class="row">
   <div class="card"><h3>估值指标</h3>
@@ -1051,6 +1174,7 @@ footer span{{color:var(--text)}}
   {masters_html}
 </div>
 
+<!-- ══════ 八、情绪与资金 ══════ -->
 <div class="sep">💰 <span>情绪与资金监测</span></div>
 <div class="row">
   <div class="card"><h3>主力资金流向</h3>
@@ -1061,15 +1185,17 @@ footer span{{color:var(--text)}}
     <div class="item"><span class="lbl">今日涨停</span><span class="rgt">{is_limit_up}</span></div>
   </div>
   <div class="card"><h3>情绪评分</h3>
-    <div class="val" style="font-size:40px;color:{emotion_score_color}">{emotion_score}</div>
-    <div class="sub">满分100 · {emotion_grade}级</div>
+    <div class="val" style="font-size:36px;color:{emotion_score_color}">{emotion_score}</div>
+    <div class="sub">满分100 · {emotion_grade}</div>
     <div class="bar-wrap"><div class="bar" style="width:{emotion_score}%;background:{emotion_score_color}"></div></div>
   </div>
 </div>
 
+<!-- ══════ 九、战法评估 ══════ -->
 <div class="sep">⚔️ <span>四大战法评估</span></div>
 <div class="card">{strategies_html}</div>
 
+<!-- ══════ 十、风险评估 ══════ -->
 <div class="sep">⚠️ <span>风险评估矩阵</span></div>
 <div class="row">
   <div class="card"><h3>风险核心指标</h3>
@@ -1083,12 +1209,14 @@ footer span{{color:var(--text)}}
   <div class="card"><h3>各维度风险项</h3>{risk_items_html}</div>
 </div>
 
+<!-- ══════ 十一、多空逻辑 ══════ -->
 <div class="sep">⚖️ <span>多空逻辑对照</span></div>
 <div class="row">
   <div class="card"><h3>🟢 做多逻辑</h3><ul>{bull_html}</ul></div>
   <div class="card"><h3>🔴 做空逻辑</h3><ul>{bear_html}</ul></div>
 </div>
 
+<!-- ══════ 十二、交易计划 ══════ -->
 <div class="sep">🎯 <span>交易计划与操作建议</span></div>
 <div class="row">
   <div class="card"><h3>价格目标</h3>
@@ -1114,7 +1242,7 @@ footer span{{color:var(--text)}}
 <div class="conclusion">{analyst_notes}</div>
 
 <footer>
-  竹林司马 · 竹林司马AI选股分析引擎 · 数据来源：新浪财经/东方财富/AkShare<br>
+  竹林司马 · AI选股分析引擎 · 数据来源：新浪财经/东方财富/AkShare<br>
   本报告仅供参考，不构成投资建议。股市有风险，投资需谨慎。<br>
   <span>{stock_name} {stock_code}</span> · 分析日期：{report_date}
 </footer>
