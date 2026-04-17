@@ -3,10 +3,23 @@
 StockReportGenerator - 竹林司马选股分析报告生成器（核心可复用组件）
 竹林司马 · 竹林司马AI选股分析引擎
 
+版本: v1.0  (2026-04-17)
+规范文档: zhulinsma/REPORT_SPEC.md  ← 所有结构/样式修改必须同步更新该文档
+
 设计原则：
   - 完全独立：不依赖 FastAPI/Database，可在任何Python环境运行
   - 数据驱动：所有展示内容由 ReportData 控制
   - 暗色专业主题，符合机构研报审美
+
+模块结构（12个模块，详见 REPORT_SPEC.md §一）：
+  Header → Verdict → 行情快照 → 评分概览 → 技术面 → 基本面
+  → 情绪面 → 风险评估 → 趋势分析 → 四大战法 → 多空逻辑
+  → 交易计划 [→ 预测分析（可选，prediction_enabled=True）]
+
+关键规范（详见 REPORT_SPEC.md §八 禁止事项）：
+  1. 换手率 = volume_today_shares / float_share * 100，禁止用均量做分母
+  2. _grade_badge() / _action_badge() 返回纯文本，禁止模板二次包裹span
+  3. AkShare value列混合类型，用 iterrows() 转dict，禁止 .str.strip()
 
 使用示例：
     from zhulinsma.src.stock.data.fetcher import StockFetcher
